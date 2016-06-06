@@ -1,109 +1,33 @@
-library("RPostgreSQL")
-library("rgdal")
-library("rgeos")
-library("maptools")
-library("data.table")
-library("zoo")
-library("doMC")
-library("lubridate")
-library("plyr")
-library("rethinking")
-library("R2jags")
-library("rstan")
-library("spatstat")
-library("raster")
-library("geostatsp")
-library("pscl")
-library("lmtest")
-library("MASS")
-library("rstanarm")
+require(RPostgreSQL)
+require(rgdal)
+require(rgeos)
+require(maptools)
+require(data.table)
+require(zoo)
+require(doMC)
+require(lubridate)
+require(plyr)
+require(R2jags)
+require(rstan)
+require(spatstat)
+require(raster)
+require(geostatsp)
+require(pscl)
+require(lmtest)
+require(MASS)
+require(rstanarm)
 
 invlogit <- function (x) {1/(1+exp(-x))}
 
 drv <- dbDriver("PostgreSQL")  #Specify a driver for postgreSQL type database
 con <- dbConnect(drv, dbname="qaeco_spatial", user="qaeco", password="Qpostgres15", host="boab.qaeco.com", port="5432")  #Connection to database server on Boab
 
-
-## update egk predictions based on new raster
-
-system("raster2pgsql -I -M -s 28355 -t auto /home/casey/Research/Projects/Train_Collisions/EGK.tif vline.egk2 | PGPASSWORD=Qpostgres15 psql -d qaeco_spatial -h boab.qaeco.com -p 5432 -U qaeco -w")  #Use system to translate and uplaod ascii grid to postgis database
-
-# dbGetQuery(con,"
-# SELECT UpdateRasterSRID('vline', 'egk2', 'rast', 28355);
-#   ")
-
-dbGetQuery(con,"
-ALTER TABLE  gis_victoria.vic_gda9455_admin_state_1kmgrid ADD COLUMN egk3 double precision;
-
-UPDATE
-  gis_victoria.vic_gda9455_admin_state_1kmgrid
-SET
-  egk3=x.egk
-FROM
-	(SELECT g.id AS id, ST_Value(r.rast, 1, ST_Centroid(g.geom), true) AS egk
-	FROM vline.egk2 AS r, gis_victoria.vic_gda9455_admin_state_1kmgrid AS g
-	WHERE ST_Intersects(r.rast,ST_Centroid(g.geom))
-	) as x
-WHERE
-  x.id = gis_victoria.vic_gda9455_admin_state_1kmgrid.id;
-  ")
-
-
 #############Data#############
-
-## study temporal variation
-temp.data <- as.data.table(read.delim("all_coll_time.csv", header=T, sep=","))
-
-for (i in 1:nrow(temp.data)){
-  temp.data[i,dawn:=mean(crepuscule(matrix(c(145,-36.5),nrow=1,ncol=2),as.POSIXct(paste0(Year,"-",Month,"-",Day)),solarDep=6,direction=c("dawn"),POSIXct.out=FALSE)*24)]
-  temp.data[i,dusk:=mean(crepuscule(matrix(c(145,-36.5),nrow=1,ncol=2),as.POSIXct(paste0(Year,"-",Month,"-",Day)),solarDep=6,direction=c("dusk"),POSIXct.out=FALSE)*24)]
-}
-
-temp.data$night <- 0
-temp.data$crep <- 0
-
-temp.data[Hour<dawn | Hour>dusk, night:=1]
-temp.data[Hour<dawn+1 & Hour>dawn-1 | Hour<dusk+1 & Hour>dusk-1, crep:=1]
-
-hist(temp.data[,Hour],breaks=24)
-
-ggplot(temp.data[order(round(Hour,0)),.N,by="Hour"],aes(x=round(Hour,0),y=N)) +
-  geom_bar(alpha=0.5,color=NA,stat="identity") +
-  ylab("Number") +
-  xlab("Hour") +
-  theme_bw() +
-  scale_x_discrete(breaks = unique(temp.data[order(Hour),round(Hour,0)]), labels = unique(temp.data[order(Hour),round(Hour,0)])) +
-  theme(text = element_text(size = 12))
-
-plot1 <- ggplot(temp.data[,.N,by="night"],aes(x=night,y=N)) +
-  geom_bar(alpha=0.5,color=NA,stat="identity") +
-  ylab("Number of Collisions") +
-  xlab("Night") +
-  theme_bw() +
-  #scale_x_discrete(breaks = unique(temp.data[,night]), labels = unique(temp.data[,night])) +
-  theme(text = element_text(size = 12)) +
-  geom_text(aes(label=N), position=position_dodge(width=0.9), vjust=-0.25)
-
-plot2 <- ggplot(temp.data[,.N,by="crep"],aes(x=crep,y=N)) +
-  geom_bar(alpha=0.5,color=NA,stat="identity") +
-  ylab("Number of Collisions") +
-  xlab("Within One Hour of Dusk/Dawn") +
-  theme_bw() +
-  #scale_x_discrete(breaks = unique(temp.data[,crep]), labels = unique(temp.data[,crep])) +
-  theme(text = element_text(size = 12)) +
-  geom_text(aes(label=N), position=position_dodge(width=0.9), vjust=-0.25)
-
-multiplot(plot1,plot2,cols=2)
-
-hist(temp.data[,night])
-
-hist(temp.data[,crep])
-
 
 ## Get master dataset
 coll_db_h <- as.data.table(dbGetQuery(con,"
 SELECT
-  grid.id AS ID, pts.hour AS HOUR, COUNT(pts.id) AS COLL
+  grid.id AS id, pts.hour AS hour, COUNT(pts.id) AS coll
 FROM
   vline.vic_gda9455_fauna_egkcoll_train_onnetwork AS pts, gis_victoria.vic_gda9455_admin_state_1kmgrid AS grid
 WHERE
@@ -117,23 +41,32 @@ coll_db_h[,coll:=as.integer(coll)]
 
 coll_db_bgh <- as.data.table(dbGetQuery(con,"
     SELECT
-      x.id AS ID, x.egk AS EGK, AVG(x.train) AS TRAINS, AVG(x.speed) AS SPEED, x.hour as HOUR, CAST(SUM(x.COLL) AS integer) AS COLL
+      x.id AS id, x.egk AS egk, AVG(x.train) AS trains, AVG(x.speed) AS speed, x.hour AS hour, CAST(SUM(x.coll) AS integer) AS coll
     FROM
       (SELECT 
-        grid.id AS ID, grid.egk3 AS EGK, COUNT(seg.train)*ST_Length(ST_LineMerge(ST_Union(ST_intersection(grid.geom, seg.geom))))/1000 AS TRAIN, AVG(seg.speed) AS SPEED, seg.hour AS HOUR, CAST(0 AS integer) AS COLL
-      FROM
-        vline.vic_gda9455_rail_vline_speeds AS seg, gis_victoria.vic_gda9455_admin_state_1kmgrid AS grid
-      WHERE
-        ST_intersects(grid.geom, seg.geom)
-      AND
-        grid.egk3 NOTNULL
-      AND
-        seg.speed <> 'Infinity'
-      AND
-        seg.speed <= 160
-      GROUP BY
-        grid.id, grid.egk3, seg.train, seg.hour
-      ) as X
+          grid.id AS id, grid.egk AS egk, COUNT(seg.train)*ST_Length(ST_LineMerge(ST_Union(ST_intersection(grid.geom, seg.geom))))/1000 AS TRAIN, AVG(seg.speed) AS speed, seg.hour AS hour, CAST(0 AS integer) AS coll
+        FROM
+          vline.vic_gda9455_rail_vline_speeds AS seg, 
+          (SELECT 
+            g.id as id,
+            ST_Value(p.rast,ST_Centroid(g.geom)) AS egk,
+            g.geom as geom
+          FROM 
+            gis_victoria.vic_gda9455_grid_egk_preds_brt AS p,
+            gis_victoria.vic_gda9455_admin_state_1kmgrid AS g
+          WHERE
+            ST_Intersects(p.rast,ST_Centroid(g.geom))) AS grid
+        WHERE
+          ST_intersects(grid.geom, seg.geom)
+        AND
+          grid.egk NOTNULL
+        AND
+          seg.speed <> 'Infinity'
+        AND
+          seg.speed <= 160
+        GROUP BY
+          grid.id, grid.egk, seg.train, seg.hour
+        ) as x
     GROUP BY
       x.id, x.egk, x.hour
     "))
@@ -144,13 +77,13 @@ model.data.h[coll_db_h, coll := coll_db_h$coll]
 
 nomatch <- coll_db_h[!model.data.h]
 
-#write.csv(model.data.h, file = "model_data_h.csv", row.names=FALSE)
-model.data.h <- as.data.table(read.delim("model_data_h.csv", header=T, sep=","))
+#write.csv(model.data.h, file = "data/model_data_h.csv", row.names=FALSE)
+#model.data.h <- as.data.table(read.delim("data/model_data_h.csv", header=T, sep=","))
 
 ## Monthly variation in dawn/dusk
 coll_db_hm <- as.data.table(dbGetQuery(con,"
   SELECT
-    pts.id AS PID, grid.id AS ID, pts.hour AS HOUR, pts.day AS DAY, pts.month AS MONTH, pts.YEAR as YEAR, pts.x AS X, pts.y AS Y
+    pts.id AS pid, grid.id AS id, pts.hour AS hour, pts.day AS day, pts.month AS month, pts.year as year, pts.x AS x, pts.y AS y
   FROM
     vline.vic_gda9455_fauna_egkcoll_train_onnetwork AS pts, gis_victoria.vic_gda9455_admin_state_1kmgrid AS grid
   WHERE
@@ -178,8 +111,8 @@ model.data.hm[c, coll := c$N]
 
 nomatch <- coll_db_hm[!model.data.hm]
 
-#write.csv(model.data.hm, file = "model_data_hm.csv", row.names=FALSE)
-model.data.hm <- as.data.table(read.delim("model_data_hm.csv", header=T, sep=","))
+#write.csv(model.data.hm, file = "data/model_data_hm.csv", row.names=FALSE)
+#model.data.hm <- as.data.table(read.delim("data/model_data_hm.csv", header=T, sep=","))
 
 
 ## Get cross-validation datasets (by year)
@@ -365,14 +298,14 @@ mu1 <- exp(g)
 
 mu <- (1 - p) * mu1
 
-library(cplm)
+require(cplm)
 summary(cpglm(coll ~ egk + speed + sin(2*pi*(hour/24)) + cos(2*pi*(hour/24)) + sin(4*pi*(hour/24)) + cos(4*pi*(hour/24)) + log(trains), data=model.data.h))
 
 summary(glm.nb(coll ~ egk + speed + sin(2*pi*(hour/24)) + cos(2*pi*(hour/24)) + sin(4*pi*(hour/24)) + cos(4*pi*(hour/24)) + log(trains), data=model.data.h))
 
 
-library(MASS)
-library(vcd)
+require(MASS)
+require(vcd)
 fit <- goodfit(model.data.h$coll) 
 summary(fit) 
 rootogram(fit)
@@ -389,14 +322,14 @@ anova(mod1, test="Chisq")
 #packageurl <- "https://cran.r-project.org/src/contrib/Archive/pbkrtest/pbkrtest_0.4-4.tar.gz"
 #install.packages(packageurl, repos=NULL, type="source")
 
-library(AER)
+require(AER)
 deviance(mod1)/mod1$df.residual
 dispersiontest(mod1)
 
-library(car)
+require(car)
 influencePlot(mod1)
 
-library(pscl)
+require(pscl)
 mod2 <- zeroinfl(coll ~ egk + speed + sin(2*pi*(hour/24)) + cos(2*pi*(hour/24)) + sin(4*pi*(hour/24)) + cos(4*pi*(hour/24)) + offset(log(trains)), data=model.data.h, dist="poisson")
 AIC(mod1, mod2)
 
@@ -409,7 +342,7 @@ abline(h=0, lty=2)
 qqnorm(res)
 qqline(res)
 
-library(faraway)
+require(faraway)
 halfnorm(residuals(mod2))
 
 plot(res)
@@ -545,7 +478,7 @@ parameters.nb <- c("a","b1","b2","b3","b4","b5","b6","theta")
 # y.obs <- OUT.CH[29:1319,1]
 # pred <- OUT.CH[1320:2610,1]
 # y.pred <- ifelse(pred > 0.5, 1, 0) # I also calculate AUC without transforming pred into y.pred
-# library(ROCR) 
+# require(ROCR) 
 # preds <- prediction(as.numeric(y.pred), as.numeric(y.obs)) 
 # perf <- performance(preds, "tpr", "fpr") 
 # perf2 <- performance(preds, "auc") 
@@ -1711,7 +1644,7 @@ log_lik1 <- extract_log_lik(coll_model_fit4)
 loo1 <- loo(log_lik1)
 print(loo1)
 
-library(coda)
+require(coda)
 coll_model_fit3.coda<-mcmc.list(lapply(1:ncol(coll_model_fit3),function(x) mcmc(as.array(coll_model_fit3)[,x,])))
 plot(coll_model_fit3.coda)
 
