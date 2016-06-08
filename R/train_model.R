@@ -16,8 +16,7 @@ require(pscl)
 require(lmtest)
 require(MASS)
 require(rstanarm)
-
-invlogit <- function (x) {1/(1+exp(-x))}
+require(rethinking)
 
 drv <- dbDriver("PostgreSQL")  #Specify a driver for postgreSQL type database
 con <- dbConnect(drv, dbname="qaeco_spatial", user="qaeco", password="Qpostgres15", host="boab.qaeco.com", port="5432")  #Connection to database server on Boab
@@ -114,6 +113,36 @@ nomatch <- coll_db_hm[!model.data.hm]
 #write.csv(model.data.hm, file = "data/model_data_hm.csv", row.names=FALSE)
 #model.data.hm <- as.data.table(read.delim("data/model_data_hm.csv", header=T, sep=","))
 
+summary(model.data.hm)
+-
+model.data.hm[coll>=1,.N]
+model.data.hm[coll==0,.N]
+mean(model.data.hm$coll)
+var(model.data.hm$coll)
+length(unique(model.data.hm[,id]))
+
+curve(exp(-((x - mean(model.data.hm$dawn))^2) / 12) + exp(-((x - mean(model.data.hm$dusk))^2) / 12), from=0, to=24)
+
+dawn.or.dusk <- function (h, dawn = 6, dusk = 18, slope = 2) {
+  # compose a two-Gaussian curve, for day/night
+  # dawn and dusk or dusk and dawn
+  
+  # get inner and outer differences
+  diff_inner <- (dusk - dawn) / slope
+  diff_outer <- ((24 - dusk) + dawn) / slope
+  
+  ifelse(h < dawn,
+         d(h, dawn, dusk - 24, diff_outer),
+         ifelse(h < dusk,
+                d(h, dawn, dusk, diff_inner),
+                d(h, dawn + 24, dusk, diff_outer)))
+}
+
+model.data.hm$dawnordusk <- dawn.or.dusk(h=model.data.hm$hour,dawn=model.data.hm$dawn,dusk=model.data.hm$dusk)
+
+model.data.hm$light <- sin((2 * pi * (model.data.hm$hour - 6)) / 24) # ambient light intensity
+
+model.data.hm$light2 <- model.data.hm$light ^ 2
 
 ## Get cross-validation datasets (by year)
 
@@ -165,6 +194,11 @@ coll.glm.hm <- glm.nb(formula = coll ~ egk + speed + exp(-((hour - dawn)^2) / 12
 summary(coll.glm.hm)
 paste("% Error Explained: ",round(((coll.glm.hm$null.deviance - coll.glm.hm$deviance)/coll.glm.hm$null.deviance)*100,2),sep="")  #Report reduction in deviance
 
+coll.glm.hm2 <- glm.nb(formula = coll ~ egk + speed + light + light2 + dawnordusk + offset(log(trains)), data = model.data.hm, trace = TRUE, init.theta = .005)
+summary(coll.glm.hm2)
+paste("% Error Explained: ",round(((coll.glm.hm2$null.deviance - coll.glm.hm2$deviance)/coll.glm.hm2$null.deviance)*100,2),sep="")  #Report reduction in deviance
+
+
 
 model.data.hm$l.trains <- log(model.data.hm$trains)
 model.data.hm$pk.one <- exp(-((model.data.hm$hour - model.data.hm$dawn)^2) / 12)
@@ -180,64 +214,11 @@ curve(2.92988 * exp(-((x - 7)^2) / 12) + 2.67212 * exp(-((x - 19)^2) / 12),from=
 coll.glm.zip.hm <- zeroinfl(formula = coll ~ speed + exp(-((hour - dawn)^2) / 12) + exp(-((hour - dusk)^2) / 12) + offset(log(trains)) | egk, data = model.data.hm, dist = "poisson", link = "logit")
 summary(coll.glm.zip.hm)
 
-# coll.glm.zip.h <- zeroinfl(coll ~ speed + sin(2*pi*(hour/24)) + cos(2*pi*(hour/24)) + sin(4*pi*(hour/24)) + cos(4*pi*(hour/24)) + offset(log(trains)) | egk, data = model.data.h, dist = "poisson", link = "logit")
-# summary(coll.glm.zip.h)
-# Pearson residuals:
-#   Min       1Q   Median       3Q      Max 
-# -0.80253 -0.11573 -0.06018 -0.02912 42.94179 
-# 
-# Count model coefficients (poisson with log link):
-#   Estimate Std. Error z value Pr(>|z|)    
-# (Intercept)             -8.512239   0.472854 -18.002  < 2e-16 ***
-#   speed                    0.040803   0.003681  11.084  < 2e-16 ***
-#   sin(2 * pi * (hour/24))  0.193595   0.070922   2.730  0.00634 ** 
-#   cos(2 * pi * (hour/24))  0.533065   0.119389   4.465 8.01e-06 ***
-#   sin(4 * pi * (hour/24)) -0.555231   0.102418  -5.421 5.92e-08 ***
-#   cos(4 * pi * (hour/24)) -1.009353   0.100123 -10.081  < 2e-16 ***
-#   
-#   Zero-inflation model coefficients (binomial with logit link):
-#   Estimate Std. Error z value Pr(>|z|)    
-# (Intercept)   2.7284     0.1889  14.441  < 2e-16 ***
-#   egk          -5.7997     1.4097  -4.114 3.89e-05 ***
-#   ---
-#   Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1 
-# 
-# Number of iterations in BFGS optimization: 18 
-# Log-likelihood: -1881 on 8 Df
-
 
 # coll.glm.zinb.h <- zeroinfl(coll ~ speed + sin(2*pi*(hour/24)) + cos(2*pi*(hour/24)) + sin(4*pi*(hour/24)) + cos(4*pi*(hour/24)) + offset(log(trains)) | egk, data = model.data.h, dist = "negbin", link = "logit")
 # coll.glm.zinb.hn <- update(coll.glm.zinb.h, . ~ 1)
 
-
 #pchisq(2 * (logLik(coll.glm.zinb.h) - logLik(coll.glm.zinb.hn)), df = 3, lower.tail=FALSE)
-
-# summary(coll.glm.zinb.h)
-# Pearson residuals:
-#   Min       1Q   Median       3Q      Max 
-# -0.41002 -0.11251 -0.05440 -0.02334 40.07608 
-# 
-# Count model coefficients (negbin with log link):
-#   Estimate Std. Error z value Pr(>|z|)    
-# (Intercept)             -8.800124   0.419096 -20.998  < 2e-16 ***
-#   speed                    0.035264   0.004141   8.516  < 2e-16 ***
-#   sin(2 * pi * (hour/24))  0.212094   0.079121   2.681  0.00735 ** 
-#   cos(2 * pi * (hour/24))  0.573688   0.128073   4.479 7.49e-06 ***
-#   sin(4 * pi * (hour/24)) -0.553632   0.111732  -4.955 7.23e-07 ***
-#   cos(4 * pi * (hour/24)) -1.024679   0.107520  -9.530  < 2e-16 ***
-#   Log(theta)              -1.521749   0.202589  -7.511 5.85e-14 ***
-#   
-#   Zero-inflation model coefficients (binomial with logit link):
-#   Estimate Std. Error z value Pr(>|z|)    
-# (Intercept)   4.4888     0.5058   8.875  < 2e-16 ***
-#   egk         -23.0553     3.1964  -7.213 5.48e-13 ***
-#   ---
-#   Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1 
-# 
-# Theta = 0.2183 
-# Number of iterations in BFGS optimization: 31 
-# Log-likelihood: -1835 on 9 Df
-
 
 #lrtest(coll.glm.zip.h, coll.glm.zinb.h)
 
@@ -315,12 +296,18 @@ Ord_plot(model.data.h$coll)
 distplot(model.data.h$coll, type="poisson")
 distplot(model.data.h$coll, type="nbinomial")
 
+distplot(model.data.hm$coll, type="poisson")
+distplot(model.data.hm$coll, type="nbinomial")
+
 mod1 <- glm(coll ~ egk + speed + sin(2*pi*(hour/24)) + cos(2*pi*(hour/24)) + sin(4*pi*(hour/24)) + cos(4*pi*(hour/24)) + offset(log(trains)), data=model.data.h, family="poisson")
 summary(mod1)
 anova(mod1, test="Chisq")
 
-#packageurl <- "https://cran.r-project.org/src/contrib/Archive/pbkrtest/pbkrtest_0.4-4.tar.gz"
-#install.packages(packageurl, repos=NULL, type="source")
+require(VGAM)
+
+fit <- vglm(coll ~ egk + speed + exp(-((hour - dawn)^2) / 12) + exp(-((hour - dusk)^2) / 12) + offset(log(trains)), genpoisson, data = model.data.hm, trace = TRUE)
+coef(fit, matrix = TRUE)
+summary(fit)
 
 require(AER)
 deviance(mod1)/mod1$df.residual
@@ -346,6 +333,75 @@ require(faraway)
 halfnorm(residuals(mod2))
 
 plot(res)
+
+
+require(bayesm)
+id=levels(as.factor(model.data.hm$id))
+nresp<-length(unique(id))
+lgtdata=NULL
+
+for (i in 1:nresp)
+{
+  respdata=model.data.hm[id==id[i],]
+  ty<-NULL
+  tdesign<-NULL
+  ty=respdata$coll
+  nobs=length(ty)
+  for (j in 1:nobs) {
+    design<-as.matrix(respdata[j,.(egk,trains,speed,hour,dawn,dusk)])
+    tdesign<-rbind(tdesign,design)
+  }
+  lgtdata[[i]]=list(y=ty,X=as.matrix(tdesign))
+}
+
+##
+if(nchar(Sys.getenv("LONG_TEST")) != 0) {R=2000} else {R=10}
+##
+set.seed(123)
+simnegbin =
+  function(X, beta, alpha) {
+    #   Simulate from the Negative Binomial Regression
+    lambda = exp(X %*% beta)
+    y=NULL
+    for (j in 1:length(lambda))
+      y = c(y,rnbinom(1,mu = lambda[j],size = alpha))
+    return(y)
+  }
+nreg = 100        # Number of cross sectional units
+T = 50            # Number of observations per unit
+nobs = nreg*T
+nvar=2            # Number of X variables
+nz=2              # Number of Z variables
+# Construct the Z matrix
+Z = cbind(rep(1,nreg),rnorm(nreg,mean=1,sd=0.125))
+Delta = cbind(c(4,2), c(0.1,-1))
+alpha = 5
+Vbeta = rbind(c(2,1),c(1,2))
+# Construct the regdata (containing X)
+simnegbindata = NULL
+for (i in 1:nreg) {
+  betai = as.vector(Z[i,]%*%Delta) + chol(Vbeta)%*%rnorm(nvar)
+  X = cbind(rep(1,T),rnorm(T,mean=2,sd=0.25))
+  simnegbindata[[i]] = list(y=simnegbin(X,betai,alpha), X=X,beta=betai)
+}
+Beta = NULL
+for (i in 1:nreg) {Beta=rbind(Beta,matrix(simnegbindata[[i]]$beta,nrow=1))}
+Data1 = list(regdata=simnegbindata, Z=Z)
+Mcmc1 = list(R=R)
+out = rhierNegbinRw(Data=Data1, Mcmc=Mcmc1)
+cat("Summary of Delta draws",fill=TRUE)
+summary(out$Deltadraw,tvalues=as.vector(Delta))
+cat("Summary of Vbeta draws",fill=TRUE)
+summary(out$Vbetadraw,tvalues=as.vector(Vbeta[upper.tri(Vbeta,diag=TRUE)]))
+cat("Summary of alpha draws",fill=TRUE)
+summary(out$alpha,tvalues=alpha)
+if(0){
+  ## plotting examples
+  plot(out$betadraw)
+  plot(out$alpha,tvalues=alpha)
+  plot(out$Deltadraw,tvalues=as.vector(Delta))
+}
+
 
 ##### Partition data for day/night and crep/non-crep and fit models!!!
 
@@ -465,27 +521,6 @@ jags.data <- list("n", "coll", "egk", "trains", "speed", "hour", "pi")
 inits.nb <- function() list(a=1,b1=1,b2=1,b3=1,b4=1,b5=1,b6=1,theta=0.5)
 
 parameters.nb <- c("a","b1","b2","b3","b4","b5","b6","theta")
-
-# int <- set1[set1$city==acity, ]  
-# int.miss <- int # make an additional city data frame with missing values for the response to use in prediction
-# int.miss$ne <- rep(NA, length(int.miss$ne))
-# int <- rbind(int, int.miss)
-
-# OUT.LA <- as.data.frame(jagsresults(x=out.LA, params=c("b0", "b1", "b2", "b3", "b4", "b5", "b6", "b7", "b8", "b9", "b10", 
-#                                                        "s.fam", "sigma.b1", "sigma.b2", "sigma.b4", 
-#                                                        "sigma.b5", "ne", "ran.fam")))
-
-# y.obs <- OUT.CH[29:1319,1]
-# pred <- OUT.CH[1320:2610,1]
-# y.pred <- ifelse(pred > 0.5, 1, 0) # I also calculate AUC without transforming pred into y.pred
-# require(ROCR) 
-# preds <- prediction(as.numeric(y.pred), as.numeric(y.obs)) 
-# perf <- performance(preds, "tpr", "fpr") 
-# perf2 <- performance(preds, "auc") 
-# perf2
-# plot(perf, main="ROC Curve for AU", lwd=2, col="darkgreen")
-# auc <- unlist(slot(perf2, "y.values"))
-# text(0.5, 0.5, paste("AUC = ",round(auc,4),sep=""), cex=2.2, col="darkred")
 
 set.seed(123)
 out.nb.h <- jags.parallel(data = jags.data, inits = inits.nb, parameters.to.save = parameters.nb, model.file = model.nb.h, n.chains=3, n.iter=10000)
@@ -783,13 +818,45 @@ dzinbinom <- function (x, mu, scale, log = FALSE)
 <environment: namespace:rethinking>
 
 
+N <- nrow(model.data.hm)  
+y <- model.data.hm$coll
+egk <- model.data.hm$egk
+speed <- model.data.hm$speed
+trains <- model.data.hm$trains
+hour <- model.data.hm$hour
+dawn <- model.data.hm$dawn
+dusk <- model.data.hm$dusk
+light <- model.data.hm$light
+light2 <- model.data.hm$light2
+dawnordusk <- model.data.hm$dawnordusk
+
+x1 <- egk
+x2 <- speed
+x3 <- light
+x4 <- light2
+x5 <- dawnordusk
+x6 <- log(trains)
+
 set.seed(123) 
-coll.model.map10 <- map(
+coll.model.map.nb.null <- map(
   alist(
     y ~ dgampois(mu, theta), 
-    log(mu) <- a + b0*x1 + b1*x2 + log(x3) + b2*sin(2*3.14*(x4/24)) + b3*cos(2*3.14*(x4/24)) + b4*sin(4*3.14*(x4/24)) + b5*cos(4*3.14*(x4/24)),
+    log(mu) <- a,
     a ~ dnorm(0,1),
-    b0 ~ dnorm(0,1),
+    theta ~ dcauchy(0,5)
+  ),
+  start=list(a=1),
+  data=list(y=y)
+)
+precis(coll.model.map.nb.null)
+WAIC(coll.model.map.nb.null)
+
+set.seed(123) 
+coll.model.map.nb <- map(
+  alist(
+    y ~ dgampois(mu, theta), 
+    log(mu) <- a + b1*x1 + b2*x2 + b3*x3 + b4*x4 + b5*x5 + x6,
+    a ~ dnorm(0,1),
     b1 ~ dnorm(0,1),
     b2 ~ dnorm(0,1),
     b3 ~ dnorm(0,1),
@@ -797,14 +864,37 @@ coll.model.map10 <- map(
     b5 ~ dnorm(0,1),
     theta ~ dcauchy(0,5)
   ),
-  #start=list(a=1,b1=1,b2=1,b3=1),
-  data=list(y=model.data.h$coll,x1=model.data.h$egk,x2=model.data.h$speed,x3=model.data.h$trains,x4=as.numeric(model.data.h$hour))
+  start=list(a=1,b1=1,b2=1,b3=1,b4=1,b5=1),
+  data=list(y=y,x1=x1,x2=x2,x3=x3,x4=x4,x5=x5,x6=x6)
 )
-precis(coll.model.map10)
+precis(coll.model.map.nb)
+WAIC(coll.model.map.nb)
 
-compare910 <- compare(coll.model.map9,coll.model.map10)
+compare(coll.model.map.nb.null,coll.model.map.nb)
 
-#stancode(coll.model.map10)
+set.seed(123) 
+coll.model.map.zip <- map(
+  alist(
+    y ~ dzipois(p, lambda), 
+    logit(p) <- ap + bp*x1,
+    log(lambda) <- al + bl2*x2 + bl3*x3 + bl4*x4 + bl5*x5 + x6,
+    ap ~ dnorm(0,1),
+    bp ~ dnorm(0,1),
+    al ~ dnorm(0,1),
+    bl2 ~ dnorm(0,1),
+    bl3 ~ dnorm(0,1),
+    bl4 ~ dnorm(0,1),
+    bl5 ~ dnorm(0,1)
+  ),
+  start=list(ap=1,bp=1,al=1,bl2=1,bl3=1,bl4=1,bl5=1),
+  data=list(y=y,x1=x1,x2=x2,x3=x3,x4=x4,x5=x5,x6=x6)
+)
+precis(coll.model.map.zip)
+WAIC(coll.model.map.zip)
+
+compare.zip_nb <- compare(coll.model.map.nb.null,coll.model.map.nb,coll.model.map.zip)
+
+#stancode(coll.model.map.nb)
 
 n <- 3000
 y <- sample(model.data.h$coll,n)
@@ -1727,3 +1817,113 @@ scode5 <- "
 # "
 
 coll_model_fit5 <- stan(model_code = scode5, iter = 100, chains = 3, cores = 3, seed=123, verbose = FALSE)#, control =list(stepsize=0.01, adapt_delta=0.9, max_treedepth=15))
+
+
+N <- nrow(model.data.hm)  
+y <- model.data.hm$coll
+egk <- model.data.hm$egk
+speed <- model.data.hm$speed
+trains <- model.data.hm$trains
+hour <- model.data.hm$hour
+dawn <- model.data.hm$dawn
+dusk <- model.data.hm$dusk
+
+x1 <- egk
+x2 <- speed
+x3 <- log(trains)
+x4 <- exp(-((hour - dawn)^2) / 12) + exp(-((hour - dusk)^2) / 12)
+
+X <- as.matrix(cbind(x1,x2,x3,x4))
+K <- ncol(X)
+
+
+N <- 10000
+y <- sample(model.data.hm$coll, N)
+egk <- sample(model.data.hm$egk, N)
+speed <- sample(model.data.hm$speed, N)
+trains <- sample(model.data.hm$trains, N)
+hour <- sample(model.data.hm$hour, N)
+dawn <- sample(model.data.hm$dawn, N)
+dusk <- sample(model.data.hm$dusk, N)
+
+x1 <- egk
+x2 <- speed
+x3 <- log(trains)
+x4 <- exp(-((hour - dawn)^2) / 12) + exp(-((hour - dusk)^2) / 12)
+
+X <- as.matrix(cbind(x1,x2,x3,x4))
+K <- ncol(X)
+
+
+N <- 1000 #sample size
+dat <- data.frame(x1=runif(N,.01,.92),x2=runif(N,5,148),x3=runif(N,-6.5,4.2),x4=runif(N,.02,.99))
+#the model
+X <- model.matrix(~x1 + x2 + x3 + x4,dat)
+K <- dim(X)[2] #number of regression params
+#the regression slopes
+betas <- runif(K,-1,1)
+#the overdispersion for the simulated data
+phi <- 5
+#simulate the response
+y_nb <- rnbinom(1000,size=phi,mu=exp(X%*%betas))
+
+#fit the model
+m_nb <- stan(model_code = scode6,data = list(N=N,K=K,X=X,y=y_nb),pars=c("beta","phi"), chains=3, cores=3)
+
+#diagnose and explore the model using shinystan
+launch_shinystan(m_nb)
+
+scode6 <- "
+data {
+  int N; //the number of observations
+  int K; //the number of columns in the model matrix
+  int y[N]; //the response
+  matrix[N,K] X; //the model matrix
+}
+parameters {
+  vector[K] beta; //the regression parameters
+  real phi; //the overdispersion parameters
+}
+transformed parameters {
+  vector[N] mu;//the linear predictor
+  mu <- exp(X*beta); //using the log link 
+}
+model {  
+  beta[1] ~ cauchy(0,10); //prior for the intercept following Gelman 2008
+  
+  for(i in 2:K)
+    beta[i] ~ cauchy(0,2.5);//prior for the slopes following Gelman 2008
+  
+  y ~ neg_binomial_2(mu,phi);
+}
+"
+# generated quantities {
+#   vector[N] y_rep;
+#   for(n in 1:N){
+#     y_rep[n] <- neg_binomial_2_rng(mu[n],phi); //posterior draws to get posterior predictive checks
+#   }
+# }
+# "
+
+coll_model_fit6 <- stan(model_code = scode6, iter = 100, chains = 1, cores = 1, seed=123, verbose = FALSE)#, control =list(stepsize=0.01, adapt_delta=0.9, max_treedepth=15))
+
+stan_glm.nb(formula=coll ~ egk + speed + exp(-((hour - dawn)^2) / 12) + exp(-((hour - dusk)^2) / 12) + log(trains), model.data.hm)
+
+coll ~ egk + speed + exp(-((hour - dawn)^2) / 12) + exp(-((hour - dusk)^2) / 12) + offset(log(trains))
+
+
+##############INLA#############
+require(INLA)
+
+data = list(
+  coll=model.data.hm$coll,
+  egk=model.data.hm$egk,
+  speed=model.data.hm$speed,
+  light=model.data.hm$light,
+  light2=model.data.hm$light2,
+  dawnordusk=model.data.hm$dawnordusk,
+  trains=log(model.data.hm$trains)
+  )
+formula = coll ~ egk + speed + light + light2 + dawnordusk + offset(trains)
+coll.inla = inla(formula, family = "nbinomial", data = data)
+summary(coll.inla)
