@@ -126,70 +126,70 @@ for (i in dow){ #for each day of the week (train schedules vary)
 }
 
 SPLDF_TOT <- foreach(i = dow, .packages = c("rgdal","rgeos","maptools","data.table"), .combine=spRbind) %dopar% { #for each day of the week (train schedules vary)
-  SPLDF_DAY <- vector(mode='list',length(get(paste0("train_hrs_",i))))
-  for (j in get(paste0("train_hrs_",i))){
-    if (j < max(get(paste0("train_hrs_",i)))){
-      trips <- final_pt_times.gis[get(i)==1 & arrival_time>=animate.seq.hr[j] & arrival_time<animate.seq.hr[j+1],unique(trip_id)]
-      SPLDF <- vector(mode='list',length(trips))
-      for(k in trips){
-        if(nrow(final_pt_times.gis[get(i)==1 & arrival_time>=animate.seq.hr[j] & arrival_time<animate.seq.hr[j+1] & trip_id==paste(k),.(shape_id)])<=1){
+  SPLDF_DAY <- vector(mode='list',length(get(paste0("train_hrs_",i)))) #initialise vector of lists for trip_id and speeds of trains
+  for (j in get(paste0("train_hrs_",i))){ #load vector of hours that trains operate on specific day of week
+    if (j < max(get(paste0("train_hrs_",i)))){ #check if hours are below the maximum in vector (cannot use operationals for range of unknown values)
+      trips <- final_pt_times.gis[get(i)==1 & arrival_time>=animate.seq.hr[j] & arrival_time<animate.seq.hr[j+1],unique(trip_id)] #generate list of unique trips that operate on specific day of week (i) for specific hour (j)
+      SPLDF <- vector(mode='list',length(trips)) #initialise vector of lists for spatial lines for each unique trip
+      for(k in trips){ #loop over each unique trip
+        if(nrow(final_pt_times.gis[get(i)==1 & arrival_time>=animate.seq.hr[j] & arrival_time<animate.seq.hr[j+1] & trip_id==paste(k),.(shape_id)])<=1){ #check if at least 2 points exist on trip (k) during hour (j) on day of week (i); if not, skip
           next
         }
-        train.data <- final_pt_times.gis[get(i)==1 & arrival_time>=animate.seq.hr[j] & arrival_time<animate.seq.hr[j+1] & trip_id==paste(k),.(shape_id,shape_dist,x,y,arrival_time)]
-        kph <- as.vector(rep(0.0,nrow(train.data[,.(x,y)])-1))
-        SPL <- vector(mode='list',nrow(train.data[,.(x,y)])-1)
-        for (m in 2:nrow(train.data[,.(x,y)])){
-          km <- sqrt(sum((train.data[m,.(x,y)] - train.data[m-1,.(x,y)]) ^ 2))/1000
-          hour <- abs(StrToSec(train.data$arrival_time[m])-StrToSec(train.data$arrival_time[m-1]))/3600
-          kph[m-1] <- km/hour
-          if (m==2){
-            SPL <- list(Lines(list(Line(train.data[c(m-1,m),.(x,y)])),paste0(k,"-",str_sub(dow[i],1,2),"-",j,"-",m-1)))
-          }else{
-            SPL[m-1] <- list(Lines(list(Line(train.data[c(m-1,m),.(x,y)])),paste0(k,"-",str_sub(dow[i],1,2),"-",j,"-",m-1)))
+        train.data <- final_pt_times.gis[get(i)==1 & arrival_time>=animate.seq.hr[j] & arrival_time<animate.seq.hr[j+1] & trip_id==paste(k),.(shape_id,shape_dist,x,y,arrival_time)] #extract information (plus spatial) for trip (k) during hour (j) on day of week (i)
+        kph <- as.vector(rep(0.0,nrow(train.data[,.(x,y)])-1)) #initialise vector for calculated speeds on all segments of trip
+        SPL <- vector(mode='list',nrow(train.data[,.(x,y)])-1) #initialise vector of lists for spatial lines on all segments of trip
+        for (m in 2:nrow(train.data[,.(x,y)])){ #loop over each set of coordinates
+          km <- sqrt(sum((train.data[m,.(x,y)] - train.data[m-1,.(x,y)]) ^ 2))/1000 #calculate distance between points
+          hour <- abs(StrToSec(train.data$arrival_time[m])-StrToSec(train.data$arrival_time[m-1]))/3600 #calculate time in hours between points
+          kph[m-1] <- km/hour #calculate speed
+          if (m==2){ #operate on first segment
+            SPL <- list(Lines(list(Line(train.data[c(m-1,m),.(x,y)])),paste0(k,"-",str_sub(dow[i],1,2),"-",j,"-",m-1))) #construct spatial lines and add trip identification attributes
+          }else{ #for all subsequent segments
+            SPL[m-1] <- list(Lines(list(Line(train.data[c(m-1,m),.(x,y)])),paste0(k,"-",str_sub(dow[i],1,2),"-",j,"-",m-1))) #construct spatial lines and add trip identification attributes
           }
         }
-        lines <- SpatialLines(SPL, proj4string = CRS("+init=epsg:28355"))
-        data <- data.frame("train"=rep(paste(k),length(lines)),"speed"=kph,"hour"=rep(as.integer(str_sub(animate.seq.hr[j],1,2)),length(lines)),"dow"=rep(paste(i),length(lines)))
-        row.names(data) <- paste0(rep(k,length(row.names(data))),"-",rep(str_sub(dow[i],1,2),length(row.names(data))),"-",rep(j,length(row.names(data))),"-",row.names(data))
-        SPLDF[which(trips==k)] <- SpatialLinesDataFrame(lines, data)
+        lines <- SpatialLines(SPL, proj4string = CRS("+init=epsg:28355")) #combine all segments for unique trip (k) during hour (j) on day of week (i)
+        data <- data.frame("train"=rep(paste(k),length(lines)),"speed"=kph,"hour"=rep(as.integer(str_sub(animate.seq.hr[j],1,2)),length(lines)),"dow"=rep(paste(i),length(lines))) #construct attribute table for spatial lines
+        row.names(data) <- paste0(rep(k,length(row.names(data))),"-",rep(str_sub(dow[i],1,2),length(row.names(data))),"-",rep(j,length(row.names(data))),"-",row.names(data)) #assign row names for attribute table (required for spatial dataframe)
+        SPLDF[which(trips==k)] <- SpatialLinesDataFrame(lines, data) #construct spatiallines dataframe for unique trip (k) during hour (j) on day of week (i)
       }
-      SPLDF <- SPLDF[!sapply(SPLDF, is.null)]
+      SPLDF <- SPLDF[!sapply(SPLDF, is.null)] #remove any trips that do not have data or geometry
       #SPLDF2 <- do.call(rbind,SPLDF)
-      SPLDF_DAY[which(get(paste0("train_hrs_",i))==j)] <- do.call(rbind,SPLDF)
+      SPLDF_DAY[which(get(paste0("train_hrs_",i))==j)] <- do.call(rbind,SPLDF) #combine all data for all trips for all hours for doy of week (i)
       #writeOGR(SPLDF2, ".", paste("shp_files/train_speeds_",i,"_",str_sub(animate.seq.hr[j],1,2),sep=""), driver="ESRI Shapefile", overwrite_layer=TRUE)
     
     }else{
-      trips <- final_pt_times.gis[get(i)==1 & arrival_time>=animate.seq.hr[j],unique(trip_id)]
-      SPLDF <- vector(mode='list',length(trips))
-      for(k in trips){
-        if(nrow(final_pt_times.gis[get(i)==1 & arrival_time>=animate.seq.hr[j] & trip_id==paste(k),.(shape_id)])<=1){
+      trips <- final_pt_times.gis[get(i)==1 & arrival_time>=animate.seq.hr[j],unique(trip_id)] #generate list of unique trips that operate on specific day of week (i) for specific hour (j)
+      SPLDF <- vector(mode='list',length(trips)) #initialise vector of lists for spatial lines for each unique trip
+      for(k in trips){ #loop over each unique trip
+        if(nrow(final_pt_times.gis[get(i)==1 & arrival_time>=animate.seq.hr[j] & trip_id==paste(k),.(shape_id)])<=1){ #check if at least 2 points exist on trip (k) during hour (j) on day of week (i); if not, skip
           next
         }
-        train.data <- final_pt_times.gis[get(i)==1 & arrival_time>=animate.seq.hr[j] & trip_id==paste(k),.(shape_id,x,y,arrival_time)]
-        kph <- as.vector(rep(0.0,nrow(train.data[,.(x,y)])-1))
-        SPL <- vector(mode='list',nrow(train.data[,.(x,y)])-1)
-        for (m in 2:nrow(train.data[,.(x,y)])){
-          km <- sqrt(sum((train.data[m,.(x,y)] - train.data[m-1,.(x,y)]) ^ 2))/1000
-          hour <- abs(StrToSec(train.data$arrival_time[m])-StrToSec(train.data$arrival_time[m-1]))/3600
-          kph[m-1] <- km/hour
-          if (m==2){
-            SPL <- list(Lines(list(Line(train.data[c(m-1,m),.(x,y)])),paste0(k,"-",str_sub(dow[i],1,2),"-",j,"-",m-1)))
+        train.data <- final_pt_times.gis[get(i)==1 & arrival_time>=animate.seq.hr[j] & trip_id==paste(k),.(shape_id,x,y,arrival_time)] #extract information (plus spatial) for trip (k) during hour (j) on day of week (i)
+        kph <- as.vector(rep(0.0,nrow(train.data[,.(x,y)])-1)) #initialise vector for calculated speeds on all segments of trip
+        SPL <- vector(mode='list',nrow(train.data[,.(x,y)])-1) #initialise vector of lists for spatial lines on all segments of trip
+        for (m in 2:nrow(train.data[,.(x,y)])){ #loop over each set of coordinates
+          km <- sqrt(sum((train.data[m,.(x,y)] - train.data[m-1,.(x,y)]) ^ 2))/1000 #calculate distance between points
+          hour <- abs(StrToSec(train.data$arrival_time[m])-StrToSec(train.data$arrival_time[m-1]))/3600 #calculate time in hours between points
+          kph[m-1] <- km/hour #calculate speed
+          if (m==2){ #operate on first segment
+            SPL <- list(Lines(list(Line(train.data[c(m-1,m),.(x,y)])),paste0(k,"-",str_sub(dow[i],1,2),"-",j,"-",m-1))) #construct spatial lines and add trip identification attributes
           }else{
-            SPL[m-1] <- list(Lines(list(Line(train.data[c(m-1,m),.(x,y)])),paste0(k,"-",str_sub(dow[i],1,2),"-",j,"-",m-1)))
+            SPL[m-1] <- list(Lines(list(Line(train.data[c(m-1,m),.(x,y)])),paste0(k,"-",str_sub(dow[i],1,2),"-",j,"-",m-1))) #construct spatial lines and add trip identification attributes
           }
         }
-        lines <- SpatialLines(SPL, proj4string = CRS("+init=epsg:28355"))
-        data <- data.frame(train=rep(paste(k),length(lines)),speed=kph,hour=rep(as.integer(str_sub(animate.seq.hr[j],1,2)),length(lines)),dow=rep(paste(i),length(lines)))
-        row.names(data) <- paste0(rep(k,length(row.names(data))),"-",rep(str_sub(dow[i],1,2),length(row.names(data))),"-",rep(j,length(row.names(data))),"-",row.names(data))
-        SPLDF[which(trips==k)] <- SpatialLinesDataFrame(lines, data)
+        lines <- SpatialLines(SPL, proj4string = CRS("+init=epsg:28355")) #combine all segments for unique trip (k) during hour (j) on day of week (i)
+        data <- data.frame(train=rep(paste(k),length(lines)),speed=kph,hour=rep(as.integer(str_sub(animate.seq.hr[j],1,2)),length(lines)),dow=rep(paste(i),length(lines))) #construct attribute table for spatial lines
+        row.names(data) <- paste0(rep(k,length(row.names(data))),"-",rep(str_sub(dow[i],1,2),length(row.names(data))),"-",rep(j,length(row.names(data))),"-",row.names(data)) #assign row names for attribute table (required for spatial dataframe)
+        SPLDF[which(trips==k)] <- SpatialLinesDataFrame(lines, data) #construct spatiallines dataframe for unique trip (k) during hour (j) on day of week (i)
       }
-      SPLDF <- SPLDF[!sapply(SPLDF, is.null)]
+      SPLDF <- SPLDF[!sapply(SPLDF, is.null)] #remove any trips that do not have data or geometry
       #SPLDF2 <- do.call(rbind,SPLDF)
-      SPLDF_DAY[which(get(paste0("train_hrs_",i))==j)] <- do.call(rbind,SPLDF)
+      SPLDF_DAY[which(get(paste0("train_hrs_",i))==j)] <- do.call(rbind,SPLDF) #combine all data for all trips for all hours for doy of week (i)
       #writeOGR(SPLDF2, ".", paste("shp_files/train_speeds_",i,"_",str_sub(animate.seq.hr[j],1,2),sep=""), driver="ESRI Shapefile", overwrite_layer=TRUE)      
     }
   }
-  do.call(rbind,SPLDF_DAY)
+  do.call(rbind,SPLDF_DAY) # combine data for all days of the week
 }
 
 ##### Write spatial data to database #####
