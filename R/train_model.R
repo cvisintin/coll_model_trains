@@ -13,24 +13,24 @@ require(dplyr)
 require(arm)
 
 model.data <- as.data.table(read.delim("data/model_data_hm.csv", header=T, sep=","))
-model.data.hex <- as.data.table(read.delim("data/model_data_hm_hex.csv", header=T, sep=","))
+#model.data.hex <- as.data.table(read.delim("data/model_data_hm_hex.csv", header=T, sep=","))
 
 summary(model.data)
-summary(model.data.hex)
+#summary(model.data.hex)
 
 model.data$speed100 <- model.data$speed/100
-model.data$log_trains <- log(model.data$trains)
+model.data$offset <- log(model.data$trains*model.data$length)
 
-model.data.hex$speed100 <- model.data.hex$speed/100
-model.data.hex$log_trains <- log(model.data.hex$trains)
+#model.data.hex$speed100 <- model.data.hex$speed/100
+#model.data.hex$log_trains <- log(model.data.hex$trains)
 
 cor(model.data[,.(egk,trains,speed,light,light2,dawnordusk)])
 
-cor(model.data.hex[,.(egk,log_trains,speed100,light,light2,dawnordusk)])
+#cor(model.data.hex[,.(egk,log_trains,speed100,light,light2,dawnordusk)])
 
 hist(model.data$coll)
 hist(model.data$egk)
-hist(log(model.data$trains))
+hist(log(model.data$trains*model.data$length))
 hist(model.data$speed100)
 hist(model.data$light)
 hist(model.data$light2)
@@ -47,11 +47,8 @@ distplot(model.data$coll, type="nbinomial")
 
 std_sd_half <- function (x) (x-mean(x))/sd(x)*0.5
 
-model.data.bin <- model.data
+model.data.bin <- copy(model.data)
 model.data.bin[coll>1,coll:=1]
-model.data.bin[light==0,light:=.0001]
-model.data.bin[light2==0,light2:=.0001]
-model.data.bin[dawnordusk==0,dawnordusk:=.0001]
 
 model.data.cs <- model.data
 model.data.cs[coll>1,coll:=1]
@@ -766,14 +763,14 @@ traceplot(coll.stan.hur)
 
 
 
-n <- nrow(model.data.cs)
-y <- model.data.cs$coll
-egk <- model.data.cs$egk
-speed <- model.data.cs$speed
-light <- model.data.cs$light
-light2 <- model.data.cs$light2
-dawnordusk <- model.data.cs$dawnordusk
-trains <- model.data.cs$trains
+n <- nrow(model.data.bin)
+y <- model.data.bin$coll
+egk <- model.data.bin$egk
+speed <- model.data.bin$speed100
+light <- model.data.bin$light
+light2 <- model.data.bin$light2
+dawnordusk <- model.data.bin$dawnordusk
+offset <- model.data.bin$offset
 
 scode.bin <- "
 data{
@@ -784,14 +781,18 @@ data{
   vector[n] light;
   vector[n] light2;
   vector[n] dawnordusk;
-  vector[n] trains;
+  vector[n] offset;
 }
 parameters{
   vector[7] b;
 }
+transformed parameters {
+  vector [n] p;
+  for (i in 1:n) p[i] <- inv_cloglog(b[1] + b[2]*egk[i] + b[3]*speed[i] + b[4]*light[i] + b[5]*light2[i] + b[6]*dawnordusk[i] + offset[i]);
+}
 model{
-  b ~ cauchy( 0 , 2.5 );
-  y ~ bernoulli_logit(b[1] + b[2]*egk + b[3]*speed + b[4]*light + b[5]*light2 + b[6]*dawnordusk + b[7]*trains);
+  b ~ normal(0,1);
+  y ~ bernoulli(p);
 }
 "
 # generated quantities{
@@ -826,6 +827,7 @@ model{
 
 coll.stan.bin <- stan(model_code = scode.bin, iter = 500, chains = 3, cores = 3, seed=123)#, control =list(stepsize=0.01, adapt_delta=0.9, max_treedepth=15))# 962.779 seconds (Total)
 
+
 coll.stan.bin
 #           mean se_mean   sd     2.5%      25%      50%      75%    97.5% n_eff Rhat
 # b[1]    -7.25    0.00 0.08    -7.41    -7.30    -7.25    -7.20    -7.11   481 1.00
@@ -840,14 +842,38 @@ coll.stan.bin
 traceplot(As.mcmc.list(coll.stan.bin))
 save(coll.stan.bin,file="data/coll_stan_bin")
 
-coll.arm.bin <- bayesglm(coll ~ log(egk) + log(speed) + light + light2 + dawnordusk + log(trains), data=model.data.bin, family=binomial(link="cloglog"))
+coll.arm.bin <- bayesglm(coll ~ egk + speed100 + light + light2 + dawnordusk, offset=offset, data=model.data.bin, family=binomial(link="cloglog"))
 summary(coll.arm.bin)
 paste("% Error Explained: ",round(((coll.arm.bin$null.deviance - coll.arm.bin$deviance)/coll.arm.bin$null.deviance)*100,2),sep="") 
+# Coefficients:
+#               Estimate Std. Error z value Pr(>|z|)    
+# (Intercept)   -11.8056     0.3146 -37.521  < 2e-16 ***
+#   egk           2.0523     0.2387   8.598  < 2e-16 ***
+#   speed100      4.3494     0.3046  14.279  < 2e-16 ***
+#   light        -1.0836     0.1076 -10.067  < 2e-16 ***
+#   light2       -1.5999     0.1695  -9.439  < 2e-16 ***
+#   dawnordusk    0.4091     0.0648   6.313 2.74e-10 ***
+# 
+# Null deviance: 6219.9  on 291119  degrees of freedom
+# Residual deviance: 5684.1  on 291114  degrees of freedom
+# AIC: 5696.1
 
-coll.arm.bin <- bayesglm(coll ~ egk + speed + light + light2 + dawnordusk, offset = log(trains), data=model.data.bin, family=binomial(link="logit"))
-summary(coll.arm.bin)
-paste("% Error Explained: ",round(((coll.arm.bin$null.deviance - coll.arm.bin$deviance)/coll.arm.bin$null.deviance)*100,2),sep="") 
 
+coll.arm.pois <- bayesglm(coll ~ egk + speed100 + light + light2 + dawnordusk, offset = offset, data=model.data, family=poisson(link="log"))
+summary(coll.arm.pois)
+paste("% Error Explained: ",round(((coll.arm.pois$null.deviance - coll.arm.pois$deviance)/coll.arm.pois$null.deviance)*100,2),sep="") 
+# Coefficients:
+#                Estimate Std. Error z value Pr(>|z|)    
+# (Intercept)   -11.80923    0.31245 -37.796  < 2e-16 ***
+#   egk           2.05827    0.23634   8.709  < 2e-16 ***
+#   speed100      4.37288    0.30224  14.468  < 2e-16 ***
+#   light        -1.08927    0.10738 -10.144  < 2e-16 ***
+#   light2       -1.62782    0.16907  -9.628  < 2e-16 ***
+#   dawnordusk    0.42896    0.06423   6.679 2.41e-11 ***
+# 
+# Null deviance: 5511.5  on 291119  degrees of freedom
+# Residual deviance: 4956.4  on 291114  degrees of freedom
+# AIC: 5780.7
 
 coll.stanarm.bin <- stan_glm.fit(coll ~ egk + speed + light + light2 + dawnordusk + trains, data=model.data.cs, family=binomial(link="logit")) # 2309.56 seconds (Total)
 summary(coll.stanarm.bin)
