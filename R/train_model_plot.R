@@ -1,5 +1,7 @@
 require(ggplot2)
 
+invcloglog <- function (x) {1-exp(-exp(x))}
+
 d <- function (h, peak, trough, l) {
   # evaluate a two-Gaussian function for given peak/trough/lengthscale
   exp(-((h - peak) / l) ^ 2) -   exp(-((h - trough) / l) ^ 2)
@@ -154,3 +156,103 @@ ggplot(occ,aes(x=x,y=y,group=crep)) +
   scale_shape_manual(values=hour) +
   geom_hline(aes(yintercept=0), linetype=2) +
   #scale_x_continuous(breaks=seq(1, 20, 1))
+  
+
+n <- nrow(model.data.bin)
+y <- model.data.bin$coll
+egk <- model.data.bin$egk
+speed100 <- model.data.bin$speed100
+light <- model.data.bin$light
+light2 <- model.data.bin$light2
+dawnordusk <- model.data.bin$dawnordusk
+offset <- model.data.bin$offset
+light <- model.data.bin$light
+light2 <- model.data.bin$light2
+dawnordusk <- model.data.bin$dawnordusk
+
+model.coefs <- NULL
+model.coefs.err  <- NULL
+for(i in 1:6){
+  model.coefs[i] <- mean(c(unlist(coll.stan.bin@sim$samples[[1]][i])[251:500],unlist(coll.stan.bin@sim$samples[[2]][i])[251:500],unlist(coll.stan.bin@sim$samples[[3]][i])[251:500])) 
+  model.coefs.err[i] <- sd(c(unlist(coll.stan.bin@sim$samples[[1]][i])[251:500],unlist(coll.stan.bin@sim$samples[[2]][i])[251:500],unlist(coll.stan.bin@sim$samples[[3]][i])[251:500]))
+}
+  
+png('figs/egk.png', pointsize = 6, res=300, width = 900, height = 900, bg='transparent')
+ggplot(data = model.data.bin) +
+  geom_line(
+    aes(
+      x = egk,
+      y = invcloglog(
+        model.coefs[1] + model.coefs[2]*egk + model.coefs[3]*mean(speed100) + model.coefs[4]*mean(light) + model.coefs[5]*mean(light2) + model.coefs[6]*mean(dawnordusk) + mean(offset)
+      )
+    )
+  ) +
+  scale_x_continuous(limits = c(0,1), breaks = seq(0,1,.1)) +
+  #scale_y_continuous(limits = c(0,.01), breaks = seq(0,.01,.001)) +
+  xlab("EGK") +
+  ylab("RELATIVE COLLISION LIKELIHOOD") +
+  geom_ribbon(
+    aes(
+      x = egk,
+      ymin=invcloglog(
+        model.coefs[1] + (model.coefs[2]*egk - model.coefs.err[2]*egk) + model.coefs[3]*mean(speed100) + model.coefs[4]*mean(light) + model.coefs[5]*mean(light2) + model.coefs[6]*mean(dawnordusk) + mean(offset) 
+      ),
+      ymax=invcloglog(
+        model.coefs[1] + (model.coefs[2]*egk + model.coefs.err[2]*egk) + model.coefs[3]*mean(speed100) + model.coefs[4]*mean(light) + model.coefs[5]*mean(light2) + model.coefs[6]*mean(dawnordusk) + mean(offset) 
+      )
+    ),
+    alpha=0.3
+  ) +
+  theme(plot.background = element_rect(fill = "transparent",colour = NA))
+dev.off()
+
+png('figs/speed.png', pointsize = 6, res=300, width = 900, height = 900, bg='transparent')
+ggplot(data = model.data.bin) +
+  geom_line(
+    aes(
+      x = speed,
+      y = invcloglog(
+        model.coefs[1] + model.coefs[2]*mean(egk) + model.coefs[3]*speed100 + model.coefs[4]*mean(light) + model.coefs[5]*mean(light2) + model.coefs[6]*mean(dawnordusk) + mean(offset)
+      )
+    )
+  ) +
+  scale_x_continuous(limits = c(10,160), breaks = seq(10,160,10)) +
+  #scale_y_continuous(limits = c(0,.01), breaks = seq(0,.01,.001)) +
+  xlab("TRAIN SPEED") +
+  ylab("RELATIVE COLLISION LIKELIHOOD") +
+  geom_ribbon(
+    aes(
+      x = speed,
+      ymin=invcloglog(
+        model.coefs[1] + model.coefs[2]*mean(egk) + (model.coefs[3]*speed100 - model.coefs.err[3]*speed100) + model.coefs[4]*mean(light) + model.coefs[5]*mean(light2) + model.coefs[6]*mean(dawnordusk) + mean(offset) 
+      ),
+      ymax=invcloglog(
+        model.coefs[1] + model.coefs[2]*mean(egk) + (model.coefs[3]*speed100 + model.coefs.err[3]*speed100) + model.coefs[4]*mean(light) + model.coefs[5]*mean(light2) + model.coefs[6]*mean(dawnordusk) + mean(offset) 
+      )
+    ),
+    alpha=0.3
+  ) +
+  theme(plot.background = element_rect(fill = "transparent",colour = NA))
+dev.off()
+
+png('figs/hour.png', pointsize = 6, res=300, width = 900, height = 900, bg='transparent')
+ggplot(data = model.data.bin) +
+  geom_smooth(
+    aes(
+      x = hour,
+      ymin=invcloglog(
+        model.coefs[1] + model.coefs[2]*mean(egk) + model.coefs[3]*mean(speed100) + (model.coefs[4]*light - model.coefs.err[4]*light) + (model.coefs[5]*light2 - model.coefs.err[5]*light2) + (model.coefs[6]*dawnordusk - model.coefs.err[6]*dawnordusk) + mean(offset)
+      ),
+      ymax=invcloglog(
+        model.coefs[1] + model.coefs[2]*mean(egk) + model.coefs[3]*mean(speed100) + (model.coefs[4]*light + model.coefs.err[4]*light) + (model.coefs[5]*light2 + model.coefs.err[5]*light2) + (model.coefs[6]*dawnordusk + model.coefs.err[6]*dawnordusk) + mean(offset)      )
+    ),
+    alpha=0.3,
+    col='black',
+    lwd=0.6
+  ) +
+  scale_x_continuous(limits = c(0,23), breaks = seq(0,23,1)) +
+  #scale_y_continuous(limits = c(0,.01), breaks = seq(0,.01,.001)) +
+  xlab("HOUR") +
+  ylab("RELATIVE COLLISION LIKELIHOOD") +
+  theme(plot.background = element_rect(fill = "transparent",colour = NA))
+dev.off()
