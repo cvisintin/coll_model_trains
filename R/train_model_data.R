@@ -16,6 +16,18 @@ coll_db_hm <- as.data.table(dbGetQuery(con,"
     ST_contains(grid.geom, pts.geom)
   "))
 
+png('figs/coll_hour.png', pointsize = 12, res=100, width = 800, height = 600, bg='transparent')
+par(mgp=c(1.8,0.5,0),mar=c(3.0,3.0,3,1), cex.axis=0.8)
+hour_hist <- hist(coll_db_hm$hour, breaks=0:24, xlab= 'Hour', xaxt="n", xaxs="i", yaxs="i", col='grey', main='Collisions by Hour of Day')
+axis(side=1,at=hour_hist$mids,labels=seq(0,23))
+dev.off()
+
+png('figs/coll_month.png', pointsize = 14, res=100, width = 800, height = 600, bg='transparent')
+par(mgp=c(1.8,0.5,0),mar=c(3.0,3.0,3,1), cex.axis=0.8)
+month_hist <- hist(coll_db_hm$month, breaks=0:12, xlab= 'Month', xaxt="n", xaxs="i", yaxs="i", col='grey', main='Collisions by Month')
+axis(side=1,at=month_hist$mids,labels=seq(1,12))
+dev.off()
+
 spatial <- as.matrix(cbind(x=145,y=-37))
 
 for (i in 1:nrow(coll_db_hm)){
@@ -122,35 +134,40 @@ coll_db_hm <- as.data.table(dbGetQuery(con,"
   "))
 
 coll_db_bgh <- as.data.table(dbGetQuery(con,"
-    SELECT
-      x.id AS id, x.egk AS egk, AVG(x.train) AS trains, AVG(x.speed) AS speed, x.hour AS hour, CAST(SUM(x.coll) AS integer) AS coll
+  SELECT
+    y.id AS id, y.egk AS egk, AVG(y.trains) AS trains, AVG(y.length) AS length, AVG(y.speed) AS speed, y.hour AS hour, CAST(0 AS integer) AS coll
+  FROM
+    (SELECT
+      x.id AS id, x.egk AS egk, COUNT(x.trains) AS trains, AVG(x.length) AS length, AVG(x.speed) AS speed, x.hour AS hour
     FROM
       (SELECT 
-          grid.id AS id, grid.egk AS egk, COUNT(seg.train)*ST_Length(ST_LineMerge(ST_Union(ST_Intersection(grid.geom, seg.geom))))/1000 AS TRAIN, AVG(seg.speed) AS speed, seg.hour AS hour, CAST(0 AS integer) AS coll
-        FROM
-          vline.vic_gda9455_rail_vline_speeds AS seg, 
-          (SELECT 
-            g.id as id,
-            ST_Value(p.rast,ST_Centroid(g.geom)) AS egk,
-            g.geom as geom
-          FROM 
-            gis_victoria.vic_gda9455_grid_egk_preds_brt AS p,
-            gis_victoria.vic_gda9455_admin_state_1km2hexgrid AS g
-          WHERE
-            ST_Intersects(p.rast,ST_Centroid(g.geom))) AS grid
+        grid.id AS id, grid.egk AS egk, seg.dow as dow, COUNT(seg.train) AS trains, ST_Length(ST_LineMerge(ST_Union(ST_Intersection(grid.geom, seg.geom))))/1000 AS length, AVG(seg.speed) AS speed, seg.hour AS hour
+      FROM
+        vline.vic_gda9455_rail_vline_speeds AS seg, 
+        (SELECT 
+          g.id as id,
+          ST_Value(p.rast,ST_Centroid(g.geom)) AS egk,
+          g.geom as geom
+        FROM 
+          gis_victoria.vic_gda9455_grid_egk_preds_brt AS p,
+          gis_victoria.vic_gda9455_admin_state_1km2hexgrid AS g
         WHERE
-          ST_Intersects(grid.geom, seg.geom)
-        AND
-          grid.egk NOTNULL
-        AND
-          seg.speed <> 'Infinity'
-        AND
-          seg.speed <= 160
-        GROUP BY
-          grid.id, grid.egk, seg.train, seg.hour
-        ) as x
+          ST_Intersects(p.rast,ST_Centroid(g.geom))) AS grid
+      WHERE
+        ST_Intersects(grid.geom, seg.geom)
+      AND
+        grid.egk NOTNULL
+      AND
+        seg.speed <> 'Infinity'
+      AND
+        seg.speed <= 160
+      GROUP BY
+        grid.id, grid.egk, seg.train, seg.hour, seg.dow
+      ) as x
     GROUP BY
-      x.id, x.egk, x.hour
+      x.id, x.egk, x.hour, x.dow) as y
+  GROUP BY
+    y.id, y.egk, y.hour
     "))
 setkey(coll_db_bgh,id,hour)
 
