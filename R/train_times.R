@@ -200,3 +200,38 @@ dbGetQuery(con,paste0("CREATE INDEX vic_gda9455_rail_vline_speeds_gix ON vline.v
 dbGetQuery(con,paste0("SELECT UpdateGeometrySRID('vline','vic_gda9455_rail_vline_speeds','geom',28355);"))
 dbGetQuery(con,paste0("VACUUM ANALYZE vline.vic_gda9455_rail_vline_speeds;"))
 
+##### Create Plots #####
+
+vic.state <- readShapePoly("/home/casey/Research/GIS_Repo/VICTORIA/VIC_GDA94VICGRID_ADMIN_STATE.shp")
+train.routes <- readShapeLines("/home/casey/Research/GIS_Repo/VICTORIA/VIC_GDA94VICGRID_RAIL_VLINE_ROUTES.shp")
+
+animate.seq <- format(seq(strptime("00:00:00", format="%H:%M:%S"), strptime("23:59:00", format="%H:%M:%S"), 60), "%H:%M:%S")
+
+registerDoMC(detectCores() - 1)
+
+non.null.plots <- foreach(i = 1:length(animate.seq), .packages = c("rgdal","rgeos","maptools","data.table"), .combine = c) %dopar% {
+  train.data <- final_pt_times.gis[thursday==1 & arrival_time>=animate.seq[i] & arrival_time<animate.seq[i+1],.(shape_id,shape_pt_lon,shape_pt_lat,arrival_time)]
+  train.coords <- data.frame(lon=train.data$shape_pt_lon, lat=train.data$shape_pt_lat)
+  if (nrow(train.coords) != 0){
+    print(i)
+  }
+}
+
+#Create plots
+system.time(
+  final_plots <- foreach(i = non.null.plots, .packages = c("rgdal","rgeos","maptools","data.table"), .combine = c) %dopar% {
+    train.data <- final_pt_times.gis[thursday==1 & arrival_time>=animate.seq[i] & arrival_time<animate.seq[i+1],.(shape_id,shape_pt_lon,shape_pt_lat,arrival_time)]
+    train.coords <- data.frame(lon=train.data$shape_pt_lon, lat=train.data$shape_pt_lat)
+    coordinates(train.coords) <- c("lon", "lat")
+    proj4string(train.coords) <- CRS("+init=epsg:4326") # WGS84
+    CRS.vicgrid <- CRS("+init=epsg:3111") # VicGrid94
+    train.vicgrid <- spTransform(train.coords, CRS.vicgrid)
+    png(paste("output/train_plots/train_plot_",which(non.null.plots == i),".png",sep=""), width=1753, height=1122, units="px", bg="transparent")
+    par(mar = rep(0, 4))
+    plot(vic.state, lwd=1.5)
+    plot(train.routes, add = TRUE, col = "grey", lwd=1.2)
+    plot(train.vicgrid, add = TRUE, col = "steelblue", pch = 16 )
+    text(2800000, 2300000, labels = animate.seq[i], cex=3)
+    dev.off()
+  }
+)
