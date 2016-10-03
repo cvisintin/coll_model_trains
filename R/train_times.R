@@ -230,8 +230,9 @@ system.time(
     par(mar = rep(0, 4))
     plot(vic.state, lwd=1.5)
     plot(train.routes, add = TRUE, col = "grey", lwd=1.2)
-    plot(train.vicgrid, add = TRUE, col = "steelblue", pch = 16 )
-    text(2800000, 2300000, labels = animate.seq[i], cex=3)
+    plot(train.vicgrid, add = TRUE, col = "steelblue", pch = 16, cex = 2 )
+    plot(train.vicgrid, add = TRUE, col = "steelblue", pch = 1, cex = 3 )
+    text(2800000, 2300000, labels = paste0("Time of day:\n",substr(animate.seq[i],1,5)), cex=3)
     dev.off()
   }
 )

@@ -60,10 +60,10 @@ lines(diff ~ h,
       lty = 3)
 
 # parameters
-pr <- c(a = -22.43,   # intercept
-        b1 = -0.56,  # day more likely than night
-        b2 = -1.64, # midday / midnight less likely than crepuscular
-        b3 = 0.09)  # dawn slightly more likely than dusk
+pr <- c(a = -11.8,   # intercept
+        b1 = -1.08,  # day more likely than night
+        b2 = -1.60, # midday / midnight less likely than crepuscular
+        b3 = 0.41)  # dawn slightly more likely than dusk
 
 curve <- pr['a'] +
   pr['b1'] * light +

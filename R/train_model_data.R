@@ -16,15 +16,15 @@ coll_db_hm <- as.data.table(dbGetQuery(con,"
     ST_contains(grid.geom, pts.geom)
   "))
 
-png('figs/coll_hour.png', pointsize = 12, res=100, width = 800, height = 600, bg='transparent')
+png('figs/coll_hour.png', pointsize = 18, res=100, width = 1100, height = 600, bg='transparent')
 par(mgp=c(1.8,0.5,0),mar=c(3.0,3.0,3,1), cex.axis=0.8)
-hour_hist <- hist(coll_db_hm$hour, breaks=0:24, xlab= 'Hour', xaxt="n", xaxs="i", yaxs="i", col='grey', main='Collisions by Hour of Day')
+hour_hist <- hist(coll_db_hm$hour, breaks=0:24, xlab= 'Hour', xaxt="n", xaxs="i", yaxs="i", col='grey', main='Collisions by Hour of Day', font.main = 1)
 axis(side=1,at=hour_hist$mids,labels=seq(0,23))
 dev.off()
 
-png('figs/coll_month.png', pointsize = 14, res=100, width = 800, height = 600, bg='transparent')
+png('figs/coll_month.png', pointsize = 21, res=100, width = 800, height = 600, bg='transparent')
 par(mgp=c(1.8,0.5,0),mar=c(3.0,3.0,3,1), cex.axis=0.8)
-month_hist <- hist(coll_db_hm$month, breaks=0:12, xlab= 'Month', xaxt="n", xaxs="i", yaxs="i", col='grey', main='Collisions by Month')
+month_hist <- hist(coll_db_hm$month, breaks=0:12, xlab= 'Month', xaxt="n", xaxs="i", yaxs="i", col='grey', main='Collisions by Month', font.main = 1)
 axis(side=1,at=month_hist$mids,labels=seq(1,12))
 dev.off()
 

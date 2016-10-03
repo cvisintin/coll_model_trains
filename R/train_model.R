@@ -22,11 +22,11 @@ model.data$speed100 <- model.data$speed/100
 model.data$offset <- log(model.data$trains*model.data$length)
 
 #model.data.hex$speed100 <- model.data.hex$speed/100
-#model.data.hex$log_trains <- log(model.data.hex$trains)
+#model.data.hex$offset <- log(model.data.hex$trains*model.data.hex$length)
 
-cor(model.data[,.(egk,trains,speed,light,light2,dawnordusk)])
+cor(model.data[,.(egk,trains,speed100,light,light2,dawnordusk)])
 
-#cor(model.data.hex[,.(egk,log_trains,speed100,light,light2,dawnordusk)])
+#cor(model.data.hex[,.(egk,trains,speed100,light,light2,dawnordusk)])
 
 hist(model.data$coll)
 hist(model.data$egk)
@@ -49,6 +49,11 @@ std_sd_half <- function (x) (x-mean(x))/sd(x)*0.5
 
 model.data.bin <- copy(model.data)
 model.data.bin[coll>1,coll:=1]
+
+write.csv(model.data.bin, "data/model_data_hm_bin.csv", row.names=FALSE)
+
+model.data.hex.bin <- copy(model.data.hex)
+model.data.hex.bin[coll>1,coll:=1]
 
 model.data.cs <- model.data
 model.data.cs[coll>1,coll:=1]
@@ -137,7 +142,7 @@ hist(s.coll.hur)
 # paste("% Error Explained: ",round(((coll.glm.bin$null.deviance - coll.glm.bin$deviance)/coll.glm.bin$null.deviance)*100,2),sep="")
 
 
-coll.glm.pois <- glm(formula = coll ~ egk + speed100 + light + light2 + dawnordusk, family = poisson(link = "log"), data = model.data, offset = log_trains)
+coll.glm.pois <- glm(formula = coll ~ egk + speed100 + light + light2 + dawnordusk, family = poisson(link = "log"), data = model.data, offset = trains*length)
 summary(coll.glm.pois)
 paste("% Error Explained: ",round(((coll.glm.pois$null.deviance - coll.glm.pois$deviance)/coll.glm.pois$null.deviance)*100,2),sep="")  #Report reduction in deviance
 # Coefficients:
@@ -788,7 +793,7 @@ parameters{
 }
 transformed parameters {
   vector [n] p;
-  for (i in 1:n) p[i] <- inv_cloglog(b[1] + b[2]*egk[i] + b[3]*speed[i] + b[4]*light[i] + b[5]*light2[i] + b[6]*dawnordusk[i] + offset[i]);
+  for (i in 1:n) p[i] = inv_cloglog(b[1] + b[2]*egk[i] + b[3]*speed[i] + b[4]*light[i] + b[5]*light2[i] + b[6]*dawnordusk[i] + offset[i]);
 }
 model{
   b ~ normal(0,1);
@@ -875,9 +880,9 @@ paste("% Error Explained: ",round(((coll.arm.pois$null.deviance - coll.arm.pois$
 # Residual deviance: 4956.4  on 291114  degrees of freedom
 # AIC: 5780.7
 
-coll.stanarm.bin <- stan_glm.fit(coll ~ egk + speed + light + light2 + dawnordusk + trains, data=model.data.cs, family=binomial(link="logit")) # 2309.56 seconds (Total)
+options(mc.cores = parallel::detectCores())
+coll.stanarm.bin <- stan_glm(coll ~ log(egk) + log(trains) + log(speed) + light + light2 + dawnordusk, offset=log(length), data=model.data.bin, family=binomial(link="cloglog")) #2847.49 seconds (Total)
 summary(coll.stanarm.bin)
-paste("% Error Explained: ",round(((coll.stanarm.bin$null.deviance - coll.stanarm.bin$deviance)/coll.stanarm.bin$null.deviance)*100,2),sep="") 
 
 save(coll.stanarm.bin,file="data/coll_stanarm_bin")
 
@@ -890,9 +895,9 @@ y_sim <- rnorm(n = nrow(sims), mean = sims[,1:(ncol(sims)-1)] %*% t(as.matrix(s1
 mean(y_sim)
 
 
+coll.loo.bin <- loo(coll.stanarm.bin)
 
-
-
+launch_shinystan(coll.stanarm.bin)
 
 log_lik.nb <- extract_log_lik(coll.stan.nb)
 
@@ -902,4 +907,4 @@ plot(log_lik.nb[1,],s.coll.nb)
 
 for(i in 1:ncol(log_lik.nb)) abline(lm(s.coll~log_lik.nb[i,]))
 
-pp_check(coll.stan.nb, check = "distributions", overlay = FALSE, nreps = 5)
+pp_check(coll.stanarm.bin, check = "distributions", overlay = FALSE, nreps = 5)
