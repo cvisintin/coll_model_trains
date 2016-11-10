@@ -2,8 +2,8 @@ require(data.table)
 require(pscl)
 require(R2jags)
 require(rstan)
-require(spatstat)
 require(rstanarm)
+require(spatstat)
 require(rethinking)
 require(INLA)
 require(vcd)
@@ -11,11 +11,18 @@ require(MASS)
 require(loo)
 require(dplyr)
 require(arm)
+require(doMC)
+require(boot)
 
 model.data <- as.data.table(read.delim("data/model_data_hm.csv", header=T, sep=","))
 #model.data.hex <- as.data.table(read.delim("data/model_data_hm_hex.csv", header=T, sep=","))
 
-summary(model.data)
+model.data.bin <- copy(model.data)
+model.data.bin[coll>1,coll:=1]
+#write.csv(model.data.bin, "data/model_data_hm_bin.csv", row.names=FALSE)
+rm(model.data)
+
+summary(model.data.bin)
 #summary(model.data.hex)
 
 model.data$speed100 <- model.data$speed/100
@@ -46,9 +53,6 @@ distplot(model.data$coll, type="poisson")
 distplot(model.data$coll, type="nbinomial")
 
 std_sd_half <- function (x) (x-mean(x))/sd(x)*0.5
-
-model.data.bin <- copy(model.data)
-model.data.bin[coll>1,coll:=1]
 
 write.csv(model.data.bin, "data/model_data_hm_bin.csv", row.names=FALSE)
 
@@ -505,7 +509,7 @@ x2 <- model.data$speed100
 x3 <- model.data$light
 x4 <- model.data$light2
 x5 <- model.data$dawnordusk
-x6 <- model.data$log_trains
+x6 <- log(model.data$trains*model.data$length)
 
 #Real Data (hex):
 n <- nrow(model.data.hex)
@@ -539,7 +543,7 @@ real b5;
 }
 transformed parameters {
 vector[n] mu;
-for(i in 1:n)  mu[i] <- exp(a + b1*x1[i] + b2*x2[i] + b3*x3[i] + b4*x4[i] + b5*x5[i] + x6[i]);
+for(i in 1:n)  mu[i] = exp(a + b1*x1[i] + b2*x2[i] + b3*x3[i] + b4*x4[i] + b5*x5[i] + x6[i]);
 }
 model{
 b5 ~ normal( 0 , 1 );
@@ -908,3 +912,264 @@ plot(log_lik.nb[1,],s.coll.nb)
 for(i in 1:ncol(log_lik.nb)) abline(lm(s.coll~log_lik.nb[i,]))
 
 pp_check(coll.stanarm.bin, check = "distributions", overlay = FALSE, nreps = 5)
+
+###################Current Model###########################
+
+n <- nrow(model.data.bin)
+y <- model.data.bin$coll
+egk <- model.data.bin$egk
+trains <- model.data.bin$trains
+speed <- model.data.bin$speed
+light <- model.data.bin$light
+light2 <- model.data.bin$light2
+dawnordusk <- model.data.bin$dawnordusk
+kilometre <- model.data.bin$length
+
+stan_rdump(c('n','y','egk','trains','speed','light','light2','dawnordusk','kilometre'),file="/home/casey/cmdstan-2.12.0/examples/bern_cloglog/data.R")
+
+file.create("/home/casey/cmdstan-2.12.0/examples/bern_cloglog/model.stan")
+fileConn<-file("/home/casey/cmdstan-2.12.0/examples/bern_cloglog/model.stan")
+writeLines(c("data{
+int<lower=1> n;
+int<lower=0,upper=1> y[n];
+vector[n] egk;
+vector[n] trains;
+vector[n] speed;
+vector[n] light;
+vector[n] light2;
+vector[n] dawnordusk;
+vector[n] kilometre;
+}
+transformed data{
+vector[n] log_egk_c;
+vector[n] log_trains_c;
+vector[n] log_speed_c;
+vector[n] light_c;
+vector[n] light2_c;
+vector[n] dawnordusk_c;
+vector[n] log_kilometre;
+             
+log_egk_c = log(egk)-mean(log(egk));
+log_trains_c = log(trains)-mean(log(trains));
+log_speed_c = log(speed)-mean(log(speed));
+             
+light_c = light-mean(light);
+light2_c = light2-mean(light2);
+dawnordusk_c = dawnordusk-mean(dawnordusk);
+             
+log_kilometre = log(kilometre);
+}
+parameters{
+vector[7] b;
+}
+transformed parameters{
+vector[n] p;
+for (i in 1:n) p[i] = inv_cloglog(b[1] + b[2]*log_egk_c[i] + b[3]*log_trains_c[i] + b[4]*log_speed_c[i] + b[5]*light_c[i] + b[6]*light2_c[i] + b[7]*dawnordusk_c[i] + log_kilometre[i]);
+}
+model{
+b ~ normal(0,1);
+y ~ bernoulli(p);
+}
+generated quantities{
+vector log_lik;
+vector sum_log_lik
+
+             
+for(i in 1:n) log_lik[i] = binomial_lpmf(y[i]|1,p[i]); //posterior draws to get posterior predictive checks
+}"), fileConn)
+close(fileConn)
+
+scode.bin <- "
+data{
+int<lower=1> n;
+int<lower=0,upper=1> y[n];
+vector[n] egk;
+vector[n] trains;
+vector[n] speed;
+vector[n] light;
+vector[n] light2;
+vector[n] dawnordusk;
+vector[n] kilometre;
+}
+transformed data{
+vector[n] log_egk_c;
+vector[n] log_trains_c;
+vector[n] log_speed_c;
+vector[n] light_c;
+vector[n] light2_c;
+vector[n] dawnordusk_c;
+vector[n] log_kilometre;
+
+log_egk_c = log(egk)-mean(log(egk));
+log_trains_c = log(trains)-mean(log(trains));
+log_speed_c = log(speed)-mean(log(speed));
+
+light_c = light-mean(light);
+light2_c = light2-mean(light2);
+dawnordusk_c = dawnordusk-mean(dawnordusk);
+
+log_kilometre = log(kilometre);
+}
+parameters{
+vector[7] b;
+}
+transformed parameters{
+vector[n] p;
+for (i in 1:n) p[i] = inv_cloglog(b[1] + b[2]*log_egk_c[i] + b[3]*log_trains_c[i] + b[4]*log_speed_c[i] + b[5]*light_c[i] + b[6]*light2_c[i] + b[7]*dawnordusk_c[i] + log_kilometre[i]);
+}
+model{
+b ~ normal(0,1);
+y ~ bernoulli(p);
+}
+generated quantities{
+//vector[n] log_lik;
+//for(i in 1:n) log_lik[i] = binomial_lpmf(y[i]|1,p[i]); //posterior draws to get posterior predictive checks
+
+    real loglik;
+    real total_loglik;
+    real y_hat[n];
+    # initialize total_loglik
+    total_loglik = 0;
+    
+    for (i in 1:n) {
+      y_hat[i] <- alpha + beta * ln_alf_heldout[i];
+      loglik <- normal_log(y[i], y_hat[i], sigma_obs);
+      total_loglik_heldout = total_loglik + loglik;
+      # We are only monitoring the summed loglik here.
+      # But above can easily be modified to give obervation log likelihood
+      # However, if you are dealing with large datasets this will consume alot of memory.
+    }
+
+}
+"
+
+coll.stan.bin <- stan(model_code = scode.bin, iter = 500, chains = 1, cores = 1, seed=123)#, control =list(stepsize=0.01, adapt_delta=0.9, max_treedepth=15))
+
+coll.stan.bin
+#           mean se_mean   sd     2.5%      25%      50%      75%    97.5% n_eff Rhat
+# b[1]    -7.09    0.00 0.08    -7.25    -7.15    -7.09    -7.04    -6.93   942    1
+# b[2]     0.58    0.00 0.06     0.47     0.54     0.58     0.62     0.69  1313    1
+# b[3]     0.01    0.00 0.09    -0.16    -0.05     0.01     0.07     0.18  1204    1
+# b[4]     3.21    0.01 0.29     2.64     3.01     3.20     3.40     3.76  1243    1
+# b[5]    -0.65    0.00 0.11    -0.85    -0.72    -0.65    -0.58    -0.44   989    1
+# b[6]    -1.76    0.00 0.15    -2.07    -1.86    -1.76    -1.65    -1.46  1352    1
+# b[7]     0.26    0.00 0.07     0.13     0.21     0.26     0.30     0.39   994    1
+# lp__ -2794.54    0.07 1.79 -2798.80 -2795.42 -2794.21 -2793.21 -2792.02   668    1
+
+traceplot(As.mcmc.list(coll.stan.bin))
+save(coll.stan.bin,file="data/coll_stan_bin")
+
+csvfiles <- dir('/home/casey/cmdstan-2.12.0/examples/bern_cloglog/', pattern = 'output.csv', full.names = TRUE)
+
+coll.stan.bin <- read_stan_csv(csvfiles)
+
+data <- data.frame("y"=model.data.bin$coll,
+           "egk"=log(model.data.bin$egk)-mean(log(model.data.bin$egk)),
+           "trains"=log(model.data.bin$trains)-mean(log(model.data.bin$trains)),
+           "speed"=log(model.data.bin$speed)-mean(log(model.data.bin$speed)),
+           "light"=model.data.bin$light-mean(model.data.bin$light),
+           "light2"=model.data.bin$light2-mean(model.data.bin$light2),
+           "dawnordusk"=model.data.bin$dawnordusk-mean(model.data.bin$dawnordusk),
+           "kilometre"=log(model.data.bin$length)
+           )
+
+range(cor(data[,1:8])[cor(data[,1:8])!=1])
+
+rstan_options (auto_write=TRUE)
+options (mc.cores=parallel::detectCores() - 1)
+
+set.seed(123)
+coll.stan.bin <- stan_glm(formula=y ~ egk + trains + speed + light + light2 + dawnordusk,
+                          offset=kilometre,
+                          family=binomial(link="cloglog"),
+                          data=data,
+                          chains=3,
+                          iter=500)
+
+cross.val <- kfold(coll.stan.bin, K = 10)
+
+coll.glm <- glm(formula=y ~ egk + trains + speed + light + light2 + dawnordusk,
+           offset=kilometre,
+           family=binomial(link="cloglog"),
+           data=data)
+
+summary(coll.glm)
+
+write.csv(signif(summary(coll.glm)$coefficients, digits=4),"output/all_coll_coef.csv",row.names=FALSE)
+
+#####################cross validation#######################
+
+split_into_kfolds <- function(data, k=10) {
+  # make dataset an even multiple of 10
+  data <- data[seq_len(floor(nrow(data) / k) * k), ]
+  # execute the split
+  # use an ordered vector so that all species distributed
+  # approx. equally across groups
+  fold <- rep(seq_len(k), nrow(data)/k)
+  split(data, fold)
+}
+
+LogLoss <- function(actual, predicted, eps=0.00001) {
+  predicted <- pmin(pmax(predicted, eps), 1-eps)
+  -1/length(actual)*(sum(actual*log(predicted)+(1-actual)*log(1-predicted)))
+}
+
+roc <- function (obsdat, preddat){
+  if (length(obsdat) != length(preddat)) 
+    stop("obs and preds must be equal lengths")
+  n.x <- length(obsdat[obsdat == 0])
+  n.y <- length(obsdat[obsdat == 1])
+  xy <- c(preddat[obsdat == 0], preddat[obsdat == 1])
+  rnk <- rank(xy)
+  roc <- ((n.x * n.y) + ((n.x * (n.x + 1))/2) - sum(rnk[1:n.x]))/(n.x * n.y)
+  return(round(roc, 4))
+}
+
+# test <- split_into_kfolds(model.data, 10)
+# sapply(test, function(x) length(x$coll[x$coll==1]))
+# sapply(test, function(x) range(x$dawndusk))
+# test <- split_into_kfolds(data, 10)
+# sapply(test, function(x) length(x$y[x$y==1]))
+# sapply(test, function(x) range(x$dawnordusk))
+# 
+# test2 <- split(model.data, sample(1:10, nrow(model.data), replace=T))
+# sapply(test2, function(x) length(x$coll[x$coll==1]))
+# sapply(test2, function(x) range(x$dawndusk))
+# test2 <- split(data, sample(1:10, nrow(data), replace=T))
+# sapply(test2, function(x) length(x$y[x$y==1]))
+# sapply(test2, function(x) range(x$dawnordusk))
+
+N <- 30
+
+cv.data <- split_into_kfolds(data, N)
+sapply(cv.data, function(x) length(x$y[x$y==1]))
+sapply(cv.data, function(x) range(x$dawnordusk))
+
+registerDoMC(detectCores() - 1)
+perform.glm <-foreach(i = 1:N, .combine=cbind) %dopar% {
+  fit <- glm(formula=y ~ egk + trains + speed + light + light2 + dawnordusk,
+                          offset=kilometre,
+                          family=binomial(link="cloglog"),
+                          data=cv.data[[i]])
+  c(coef(fit), summary(fit)$coefficients[, 2], summary(coll.glm)$coefficients[, 4], "ll"=LogLoss(data$y,predict(fit, data, type="response")), "roc"=roc(data$y,predict(fit, data, type="response")))
+}
+
+
+perform.glm.30 <- cbind("coef"=signif(apply(perform.glm[1:7,], 1, mean), digits=4),
+                     "coef_sd"=signif(apply(perform.glm[1:7,], 1, sd), digits=4),
+                     "sig_no"=apply(perform.glm[15:21,], 1, function(x) sum(ifelse(x>=2E-16, 0, 1)))
+)
+
+signif(mean(perform.glm[22,]), digits=4)
+signif(sd(perform.glm[22,]), digits=4)
+
+signif(mean(perform.glm[23,]), digits=4)
+signif(sd(perform.glm[23,]), digits=4)
+
+write.csv(perform.glm.30,"output/coll_coef_30f.csv",row.names=FALSE)
+
+
+#val.pred.glm <- predict(coll.glm, test[[2]], type="link")  #Make predictions with regression model fit on link scale
+
+#summary(glm(test[[2]]$y ~ val.pred.glm, family = binomial(link = "cloglog")))  #slope is close to ine therefore model is well calibrated to external data after accounting for multiplicative differences
+
