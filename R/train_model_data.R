@@ -37,8 +37,11 @@ for (i in 1:nrow(coll_db_hm)){
 }
 setkey(coll_db_hm,id,hour,dawndusk)
 
-
-coll_db_bgh <- as.data.table(dbGetQuery(con,"
+registerDoMC(detectCores() - 1)
+coll_db_bgh <- foreach (i = c(0,70000,140000,210000,280000,350000,420000), .combine=rbind) %dopar% {
+  drv <- dbDriver("PostgreSQL")  #Specify a driver for postgreSQL type database
+  con <- dbConnect(drv, dbname="qaeco_spatial", user="qaeco", password="Qpostgres15", host="boab.qaeco.com", port="5432")  #Connection to database server on Boab
+  as.data.table(dbGetQuery(con,paste0("
   SELECT
     y.id AS id, y.egk AS egk, AVG(y.trains) AS trains, AVG(y.length) AS length, AVG(y.speed) AS speed, y.hour AS hour, CAST(0 AS integer) AS coll
   FROM
@@ -57,7 +60,13 @@ coll_db_bgh <- as.data.table(dbGetQuery(con,"
             gis_victoria.vic_gda9455_grid_egk_preds_brt AS p,
             gis_victoria.vic_gda9455_admin_state_1kmgrid AS g
           WHERE
-            ST_Intersects(p.rast,ST_Centroid(g.geom))) AS grid
+            (g.id >= ",i," AND g.id < ",i+70000,")
+          AND
+            p.rast && g.geom
+          AND
+            ST_Intersects(p.rast,ST_Centroid(g.geom))
+          ORDER BY g.id
+          LIMIT 70000) AS grid
         WHERE
           ST_Intersects(grid.geom, seg.geom)
         AND
@@ -73,19 +82,24 @@ coll_db_bgh <- as.data.table(dbGetQuery(con,"
       x.id, x.egk, x.hour, x.dow) as y
    GROUP BY
     y.id, y.egk, y.hour
-    "))
+    ")))
+}
 setkey(coll_db_bgh,id,hour)
 
-#write.csv(coll_db_bgh,"data/coll_db_bgh")
+#write.csv(coll_db_bgh,"data/coll_db_bgh", row.names=FALSE)
 #coll_db_bgh <- as.data.table(read.csv("data/coll_db_bgh"))
 
 registerDoMC(detectCores() - 1)
 coll_db_bghm <- foreach (i = 1:12, .combine=rbind) %dopar% {
-  cbind(coll_db_bgh, "dawn"=(crepuscule(spatial,as.POSIXct(paste0("2012-",as.integer(sprintf("%02d",i)),"-15")),solarDep=6,direction=c("dawn"),POSIXct.out=FALSE)*24), "dusk"=(crepuscule(spatial,as.POSIXct(paste0("2012-",as.integer(sprintf("%02d",i)),"-15")),solarDep=6,direction=c("dusk"),POSIXct.out=FALSE)*24), "dawndusk"=(crepuscule(spatial,as.POSIXct(paste0("2012-",as.integer(sprintf("%02d",i)),"-15")),solarDep=6,direction=c("dusk"),POSIXct.out=FALSE)*24)-(crepuscule(spatial,as.POSIXct(paste0("2012-",as.integer(sprintf("%02d",i)),"-15")),solarDep=6,direction=c("dawn"),POSIXct.out=FALSE)*24))
+  cbind(coll_db_bgh,
+    "dawn"=(crepuscule(spatial,as.POSIXct(paste0("2012-",as.integer(sprintf("%02d",i)),"-15")),solarDep=6,direction=c("dawn"),POSIXct.out=FALSE)*24),
+    "dusk"=(crepuscule(spatial,as.POSIXct(paste0("2012-",as.integer(sprintf("%02d",i)),"-15")),solarDep=6,direction=c("dusk"),POSIXct.out=FALSE)*24),
+    "dawndusk"=(crepuscule(spatial,as.POSIXct(paste0("2012-",as.integer(sprintf("%02d",i)),"-15")),solarDep=6,direction=c("dusk"),POSIXct.out=FALSE)*24)-(crepuscule(spatial,as.POSIXct(paste0("2012-",as.integer(sprintf("%02d",i)),"-15")),solarDep=6,direction=c("dawn"),POSIXct.out=FALSE)*24)
+    )
 }
 setkey(coll_db_bghm,id,hour,dawndusk)
 
-model.data.hm <- coll_db_bghm
+model.data.hm <- copy(coll_db_bghm)
 c <- coll_db_hm[model.data.hm,.N,by=c("id","hour","dawndusk"),nomatch=0]
 setkey(c,id,hour,dawndusk)
 
