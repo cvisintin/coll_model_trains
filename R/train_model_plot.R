@@ -3,6 +3,8 @@ require(rstan)
 
 # plotPal <- c("#94d1c7")
 
+perform.glm.1000 <- read.csv("output/coll_perform.csv", header=T)
+
 invcloglog <- function (x) {1-exp(-exp(x))}
 
 d <- function (h, peak, trough, l) {
@@ -584,7 +586,7 @@ credplot.gg <- function(d){
   return(p)
 }
 
-cv_plot <- transform(data.frame(x = rownames(perform.glm.1000), y = perform.glm.1000[, 2], y_orig = perform.glm.1000[, 1]),
+cv_plot <- transform(data.frame(x = factor(rownames(perform.glm.1000),levels=rev(unique(rownames(perform.glm.1000)))), y = perform.glm.1000[, 2], y_orig = perform.glm.1000[, 1]),
                   ylo=y-(2*perform.glm.1000[, 3]),
                   yhi=y+(2*perform.glm.1000[, 3])
                   )
@@ -593,8 +595,8 @@ credplot.gg(test)
 
 png('figs/validate.png', pointsize = 6, res=300, width = 1100, height = 900, bg='transparent')
 p <- ggplot(cv_plot, aes(x=x, y=y, ymin=ylo, ymax=yhi)) +
-  geom_pointrange(size = 0.3) +
-  geom_hline(yintercept = 0, linetype=2) +
+  geom_pointrange(size = 0.1) +
+  geom_hline(yintercept = 0, linetype=2, size=0.2) +
   coord_flip() +
   ylab("Value") +
   xlab("Test Metric") +
@@ -604,5 +606,5 @@ p <- ggplot(cv_plot, aes(x=x, y=y, ymin=ylo, ymax=yhi)) +
   theme(axis.title.y = element_text(margin=unit(c(0,.3,0,0),"cm"))) +
   theme(panel.grid.major = element_line(size=0.1),panel.grid.minor = element_line(size=0.1)) +
   theme(text = element_text(size = 10))
-p + geom_point(aes(x=x, y=y_orig), size = 2, colour='black', inherit.aes=FALSE)
+p + geom_point(aes(x=x, y=y_orig), size = 2, shape=1, inherit.aes=FALSE)
 dev.off()
