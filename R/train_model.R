@@ -13,6 +13,7 @@ require(dplyr)
 require(arm)
 require(doMC)
 require(boot)
+require(rms)
 
 model.data <- as.data.table(read.delim("data/model_data_hm.csv", header=T, sep=","))
 #model.data.hex <- as.data.table(read.delim("data/model_data_hm_hex.csv", header=T, sep=","))
@@ -1095,6 +1096,18 @@ coll.glm <- glm(formula=y ~ egk + trains + speed + light + light2 + dawnordusk,
 
 summary(coll.glm)
 
+perform.glm <- val.prob(p=predict(coll.glm, data, type="response"), y=data$y, logistic.cal=FALSE, pl=FALSE)
+
+LogLoss(data$y,predict(coll.glm, data, type="response"))
+#0.009473507
+
+coll.glm <- Glm(formula=y ~ egk + trains + speed + light + light2 + dawnordusk,
+                offset=kilometre,
+                family=binomial(link="cloglog"),
+                data=data)
+
+gIndex(coll.glm)
+
 write.csv(signif(summary(coll.glm)$coefficients, digits=4),"output/all_coll_coef.csv",row.names=FALSE)
 
 #####################cross validation#######################
@@ -1139,34 +1152,75 @@ roc <- function (obsdat, preddat){
 # sapply(test2, function(x) length(x$y[x$y==1]))
 # sapply(test2, function(x) range(x$dawnordusk))
 
-N <- 30
+N <- 10
+R <- 100
 
+set.seed(123)
 cv.data <- split_into_kfolds(data, N)
+cv.data <- split(data, sample(1:N, nrow(data), replace=T))
 sapply(cv.data, function(x) length(x$y[x$y==1]))
 sapply(cv.data, function(x) range(x$dawnordusk))
 
 registerDoMC(detectCores() - 1)
-perform.glm <-foreach(i = 1:N, .combine=cbind) %dopar% {
-  fit <- glm(formula=y ~ egk + trains + speed + light + light2 + dawnordusk,
-                          offset=kilometre,
-                          family=binomial(link="cloglog"),
-                          data=cv.data[[i]])
-  c(coef(fit), summary(fit)$coefficients[, 2], summary(coll.glm)$coefficients[, 4], "ll"=LogLoss(data$y,predict(fit, data, type="response")), "roc"=roc(data$y,predict(fit, data, type="response")))
+
+perform.glm.cv <- foreach(i = 1:R, .combine=cbind) %do% {
+  set.seed(i*123)
+  cv.data <- split(data, sample(1:N, nrow(data), replace=T))
+  glm.cv <-foreach(j = 1:N, .combine=cbind) %dopar% {
+    data.train <- do.call("rbind", cv.data[-j])
+    data.test <- cv.data[[j]]
+    fit <- glm(formula=y ~ egk + trains + speed + light + light2 + dawnordusk,
+               offset=kilometre,
+               family=binomial(link="cloglog"),
+               data=data.train)
+  
+    val.prob(p=predict(fit, data.test, type="response"), y=data.test$y, logistic.cal=FALSE, pl=FALSE)
+    # c(coef(fit),
+    #   summary(fit)$coefficients[, 2],
+    #   summary(coll.glm)$coefficients[, 4],
+    #   "ll"=LogLoss(data.test$y,predict(fit, data.test, type="response")),
+    #   "roc"=roc(data.test$y,predict(fit, data.test, type="response")),
+    #   summary(glm(data.test$y ~ predict(fit, data.test, type="link"), family = binomial(link = "cloglog")))$coefficients[, 2],
+    #   summary(glm(data.test$y ~ predict(fit, data.test, type="link"), family = binomial(link = "cloglog")))$coefficients[, 4]
+    # )
+  }
+  colnames(glm.cv) <- sapply(colnames(glm.cv), function(x) paste0(x,".",i))
+  glm.cv
 }
 
+# perform.glm.30 <- cbind("coef"=signif(apply(perform.glm[1:7,], 1, mean), digits=4),
+#                      "coef_sd"=signif(apply(perform.glm[1:7,], 1, sd), digits=4),
+#                      "sig_no"=apply(perform.glm[15:21,], 1, function(x) sum(ifelse(x>=2E-16, 0, 1)))
+# )
+# 
+# signif(mean(perform.glm[22,]), digits=4)
+# #0.009498
+# signif(sd(perform.glm[22,]), digits=4)
+# #0.002113
+# 
+# signif(mean(perform.glm[23,]), digits=4)
+# #0.8181
+# signif(sd(perform.glm[23,]), digits=4)
+# #0.04404
+# 
+# signif(apply(perform.glm[24:25,], 1, mean), digits=4)
+# 
+# signif(apply(perform.glm[26:27,], 1, sd), digits=4)
 
-perform.glm.30 <- cbind("coef"=signif(apply(perform.glm[1:7,], 1, mean), digits=4),
-                     "coef_sd"=signif(apply(perform.glm[1:7,], 1, sd), digits=4),
-                     "sig_no"=apply(perform.glm[15:21,], 1, function(x) sum(ifelse(x>=2E-16, 0, 1)))
-)
+# perform.glm.1000 <- cbind("full_model"=signif(perform.glm, digits=4)[c(1:3,11:17)],
+#                         "cv_model"=paste0(signif(apply(perform.glm.cv,1,mean)[c(1:3,11:17)], digits=4)," (",signif(apply(perform.glm.cv,1,sd)[c(1:3,11:17)], digits=4),"; ",signif(apply(perform.glm.cv,1,range), digits=4)[1,c(1:3,11:17)],":",signif(apply(perform.glm.cv,1,range), digits=4)[2,c(1:3,11:17)] ,")")
+# )
 
-signif(mean(perform.glm[22,]), digits=4)
-signif(sd(perform.glm[22,]), digits=4)
+perform.glm.1000 <- cbind("full_model"=signif(perform.glm, digits=4)[c(1:3,11:17)],
+                          "cv_model_mean"=signif(apply(perform.glm.cv,1,mean)[c(1:3,11:17)], digits=4),
+                          "cv_model_sd"=signif(apply(perform.glm.cv,1,sd)[c(1:3,11:17)], digits=4),
+                          "cv_model_rlo"=signif(apply(perform.glm.cv,1,range), digits=4)[1,c(1:3,11:17)],
+                          "cv_model_rhi"=signif(apply(perform.glm.cv,1,range), digits=4)[2,c(1:3,11:17)]
+                          )
 
-signif(mean(perform.glm[23,]), digits=4)
-signif(sd(perform.glm[23,]), digits=4)
+write.csv(perform.glm.1000,"output/coll_perform.csv",row.names=FALSE)
 
-write.csv(perform.glm.30,"output/coll_coef_30f.csv",row.names=FALSE)
+
 
 
 #val.pred.glm <- predict(coll.glm, test[[2]], type="link")  #Make predictions with regression model fit on link scale
