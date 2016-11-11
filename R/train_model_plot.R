@@ -344,7 +344,7 @@ dev.off()
 #                       model.coefs.ci[3,1]*(log(x)-mean(log(x))) +
 #                       model.coefs[4,4]*mean(log(speed)-mean(log(speed))) +
 #                       model.coefs[5,4]*mean(light-mean(light)) +
-#                       model.coefs[6,4]*mean(light2-mean(light2)) +
+#                     theme(plot.background = element_rect(fill = "transparent",colour = NA), axis.text.y = element_blank())  model.coefs[6,4]*mean(light2-mean(light2)) +
 #                       model.coefs[7,4]*mean(dawnordusk-mean(dawnordusk)) +
 #                       mean(log(kilometre))
 #                   ),
@@ -558,3 +558,51 @@ dev.off()
 #   ylab("") +
 #   theme(plot.background = element_rect(fill = "transparent",colour = NA), axis.text.y = element_blank())
 # dev.off()
+
+#####################################
+
+credplot.gg <- function(d){
+  # d is a data frame with 4 columns
+  # d$x gives variable names
+  # d$y gives center point
+  # d$ylo gives lower limits
+  # d$yhi gives upper limits
+  require(ggplot2)
+  p <- ggplot(d, aes(x=x, y=y, ymin=ylo, ymax=yhi)) +
+    geom_pointrange() +
+    geom_hline(yintercept = 0, linetype=2) +
+    coord_flip() +
+    xlab('Test Metric') +
+    ylab('Value') +
+    theme_bw() +
+    theme(legend.key = element_blank()) +
+    theme(plot.margin=unit(c(.5,0,.1,.1),"cm")) +
+    theme(axis.title.x = element_text(margin=unit(c(.3,0,0,0),"cm"))) +
+    theme(axis.title.y = element_text(margin=unit(c(0,.3,0,0),"cm"))) +
+    theme(panel.grid.major = element_line(size=0.1),panel.grid.minor = element_line(size=0.1)) +
+    theme(text = element_text(size = 10))
+  return(p)
+}
+
+cv_plot <- transform(data.frame(x = rownames(perform.glm.1000), y = perform.glm.1000[, 2], y_orig = perform.glm.1000[, 1]),
+                  ylo=y-(2*perform.glm.1000[, 3]),
+                  yhi=y+(2*perform.glm.1000[, 3])
+                  )
+
+credplot.gg(test)
+
+png('figs/validate.png', pointsize = 6, res=300, width = 1100, height = 900, bg='transparent')
+p <- ggplot(cv_plot, aes(x=x, y=y, ymin=ylo, ymax=yhi)) +
+  geom_pointrange(size = 0.3) +
+  geom_hline(yintercept = 0, linetype=2) +
+  coord_flip() +
+  ylab("Value") +
+  xlab("Test Metric") +
+  theme_bw() +
+  theme(plot.margin=unit(c(.5,0,.1,.1),"cm")) +
+  theme(axis.title.x = element_text(margin=unit(c(.3,0,0,0),"cm"))) +
+  theme(axis.title.y = element_text(margin=unit(c(0,.3,0,0),"cm"))) +
+  theme(panel.grid.major = element_line(size=0.1),panel.grid.minor = element_line(size=0.1)) +
+  theme(text = element_text(size = 10))
+p + geom_point(aes(x=x, y=y_orig), size = 2, colour='black', inherit.aes=FALSE)
+dev.off()
