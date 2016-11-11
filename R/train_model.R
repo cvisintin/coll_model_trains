@@ -1098,17 +1098,17 @@ summary(coll.glm)
 
 perform.glm <- val.prob(p=predict(coll.glm, data, type="response"), y=data$y, logistic.cal=FALSE, pl=FALSE)
 
-LogLoss(data$y,predict(coll.glm, data, type="response"))
-#0.009473507
-
-coll.glm <- Glm(formula=y ~ egk + trains + speed + light + light2 + dawnordusk,
-                offset=kilometre,
-                family=binomial(link="cloglog"),
-                data=data)
-
-gIndex(coll.glm)
-
-write.csv(signif(summary(coll.glm)$coefficients, digits=4),"output/all_coll_coef.csv",row.names=FALSE)
+# LogLoss(data$y,predict(coll.glm, data, type="response"))
+# #0.009473507
+# 
+# coll.glm <- Glm(formula=y ~ egk + trains + speed + light + light2 + dawnordusk,
+#                 offset=kilometre,
+#                 family=binomial(link="cloglog"),
+#                 data=data)
+# 
+# gIndex(coll.glm)
+# 
+# write.csv(signif(summary(coll.glm)$coefficients, digits=4),"output/all_coll_coef.csv",row.names=FALSE)
 
 #####################cross validation#######################
 
@@ -1155,14 +1155,15 @@ roc <- function (obsdat, preddat){
 N <- 10
 R <- 100
 
-set.seed(123)
-cv.data <- split_into_kfolds(data, N)
-cv.data <- split(data, sample(1:N, nrow(data), replace=T))
-sapply(cv.data, function(x) length(x$y[x$y==1]))
-sapply(cv.data, function(x) range(x$dawnordusk))
+# set.seed(123)
+# cv.data <- split_into_kfolds(data, N)
+# cv.data <- split(data, sample(1:N, nrow(data), replace=T))
+# sapply(cv.data, function(x) length(x$y[x$y==1]))
+# sapply(cv.data, function(x) range(x$dawnordusk))
 
 registerDoMC(detectCores() - 1)
 
+system.time(
 perform.glm.cv <- foreach(i = 1:R, .combine=cbind) %do% {
   set.seed(i*123)
   cv.data <- split(data, sample(1:N, nrow(data), replace=T))
@@ -1187,6 +1188,7 @@ perform.glm.cv <- foreach(i = 1:R, .combine=cbind) %do% {
   colnames(glm.cv) <- sapply(colnames(glm.cv), function(x) paste0(x,".",i))
   glm.cv
 }
+)
 
 # perform.glm.30 <- cbind("coef"=signif(apply(perform.glm[1:7,], 1, mean), digits=4),
 #                      "coef_sd"=signif(apply(perform.glm[1:7,], 1, sd), digits=4),
@@ -1217,6 +1219,8 @@ perform.glm.1000 <- cbind("full_model"=signif(perform.glm, digits=4)[c(1:3,11:17
                           "cv_model_rlo"=signif(apply(perform.glm.cv,1,range), digits=4)[1,c(1:3,11:17)],
                           "cv_model_rhi"=signif(apply(perform.glm.cv,1,range), digits=4)[2,c(1:3,11:17)]
                           )
+
+save(perform.glm,file="output/perform_glm")
 
 write.csv(perform.glm.1000,"output/coll_perform.csv",row.names=FALSE)
 
