@@ -3,7 +3,7 @@ require(rstan)
 
 # plotPal <- c("#94d1c7")
 
-perform.glm.1000 <- read.csv("output/coll_perform.csv", header=T)
+perform.glm.1000 <- read.csv("output/perform_glm_1000.csv", header=T)
 
 invcloglog <- function (x) {1-exp(-exp(x))}
 
@@ -563,18 +563,18 @@ dev.off()
 
 #####################################
 
-metrics <- factor(c("Somer's D","ROC","Adj. R2","Brier Score","Intercept","Slope","Emax","S:z","S:p","Eavg"),
-                  levels=c("Dxy","C (ROC)","R2","Brier","Intercept","Slope","Emax","S:z","S:p","Eavg"))
+metrics <- factor(c("ROC","Adjusted R2","Somer's D","Brier Score","Intercept","Slope"),
+                  levels=rev(c("ROC","Adjusted R2","Somer's D","Brier Score","Intercept","Slope")))
 
-cv_plot <- transform(data.frame(x = factor(rownames(perform.glm.1000),levels=rev(unique(rownames(perform.glm.1000)))), y = perform.glm.1000[, 2], y_orig = perform.glm.1000[, 1]),
-                  ylo=y-(2*perform.glm.1000[, 3]),
-                  yhi=y+(2*perform.glm.1000[, 3])
+cv_plot <- transform(data.frame(x = metrics, y = perform.glm.1000[, 2], y_orig = perform.glm.1000[, 1]),
+                  ylo=perform.glm.1000[, 4],
+                  yhi=perform.glm.1000[, 5]
                   )
 
 png('figs/validate.png', pointsize = 6, res=300, width = 900, height = 900, bg='transparent')
 p <- ggplot(cv_plot, aes(x=x, y=y, ymin=ylo, ymax=yhi)) +
   geom_pointrange(size = 0.1) +
-  geom_hline(yintercept = 0, linetype=2, size=0.2) +
+  #geom_hline(yintercept = 0, linetype=2, size=0.2) +
   coord_flip() +
   ylab("Value") +
   xlab("Test Metric") +
@@ -584,5 +584,8 @@ p <- ggplot(cv_plot, aes(x=x, y=y, ymin=ylo, ymax=yhi)) +
   theme(axis.title.y = element_text(margin=unit(c(0,.3,0,0),"cm"))) +
   theme(panel.grid.major = element_line(size=0.1),panel.grid.minor = element_line(size=0.1)) +
   theme(text = element_text(size = 10))
-p + geom_point(aes(x=x, y=y_orig), size = 2, shape=1, inherit.aes=FALSE)
+p + geom_point(aes(x=x, y=y_orig), size = 2, shape=1, inherit.aes=FALSE) +
+  geom_segment(aes(x = 4.5, y = 1, xend = 6.5, yend = 1), linetype=2, size=0.1) +
+  geom_segment(aes(x = 1.5, y = 0, xend = 4.5, yend = 0), linetype=2, size=0.1) +
+  geom_segment(aes(x = 0.5, y = 1, xend = 1.5, yend = 1), linetype=2, size=0.1)
 dev.off()

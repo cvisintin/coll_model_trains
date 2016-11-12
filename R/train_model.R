@@ -1074,6 +1074,16 @@ data <- data.frame("y"=model.data.bin$coll,
            "kilometre"=log(model.data.bin$length)
            )
 
+data2 <- data.frame("y"=model.data.bin$coll,
+                   "egk"=rescale(log(model.data.bin$egk)),
+                   "trains"=rescale(log(model.data.bin$trains)),
+                   "speed"=rescale(log(model.data.bin$speed)),
+                   "light"=rescale(model.data.bin$light),
+                   "light2"=rescale(model.data.bin$light2),
+                   "dawnordusk"=rescale(model.data.bin$dawnordusk),
+                   "kilometre"=log(model.data.bin$length)
+)
+
 range(cor(data[,1:8])[cor(data[,1:8])!=1])
 
 rstan_options (auto_write=TRUE)
@@ -1093,6 +1103,11 @@ coll.glm <- glm(formula=y ~ egk + trains + speed + light + light2 + dawnordusk,
            offset=kilometre,
            family=binomial(link="cloglog"),
            data=data)
+
+coll.glm2 <- glm(formula=y ~ egk + trains + speed + light + light2 + dawnordusk,
+                offset=kilometre,
+                family=binomial(link="cloglog"),
+                data=data2)
 
 summary(coll.glm)
 
@@ -1213,11 +1228,11 @@ perform.glm.cv <- foreach(i = 1:R, .combine=cbind) %do% {
 #                         "cv_model"=paste0(signif(apply(perform.glm.cv,1,mean)[c(1:3,11:17)], digits=4)," (",signif(apply(perform.glm.cv,1,sd)[c(1:3,11:17)], digits=4),"; ",signif(apply(perform.glm.cv,1,range), digits=4)[1,c(1:3,11:17)],":",signif(apply(perform.glm.cv,1,range), digits=4)[2,c(1:3,11:17)] ,")")
 # )
 
-perform.glm.1000 <- cbind("full_model"=signif(perform.glm, digits=4)[c(1:3,11:17)],
-                          "cv_model_mean"=signif(apply(perform.glm.cv,1,mean)[c(1:3,11:17)], digits=4),
-                          "cv_model_sd"=signif(apply(perform.glm.cv,1,sd)[c(1:3,11:17)], digits=4),
-                          "cv_model_rlo"=signif(apply(perform.glm.cv,1,range), digits=4)[1,c(1:3,11:17)],
-                          "cv_model_rhi"=signif(apply(perform.glm.cv,1,range), digits=4)[2,c(1:3,11:17)]
+perform.glm.1000 <- cbind("full_model"=signif(perform.glm, digits=4)[c(2,3,1,11:13)],
+                          "cv_model_mean"=signif(apply(perform.glm.cv,1,mean)[c(2,3,1,11:13)], digits=4),
+                          "cv_model_sd"=signif(apply(perform.glm.cv,1,sd)[c(2,3,1,11:13)], digits=4),
+                          "cv_model_rlo"=signif(apply(perform.glm.cv,1,range), digits=4)[1,c(2,3,1,11:13)],
+                          "cv_model_rhi"=signif(apply(perform.glm.cv,1,range), digits=4)[2,c(2,3,1,11:13)]
                           )
 
 save(perform.glm.cv,file="output/perform_glm_cv")
@@ -1228,3 +1243,18 @@ write.csv(perform.glm.1000,"output/perform_glm_1000.csv",row.names=FALSE)
 
 #summary(glm(test[[2]]$y ~ val.pred.glm, family = binomial(link = "cloglog")))  #slope is close to ine therefore model is well calibrated to external data after accounting for multiplicative differences
 
+data.a <- as.data.table(cbind(data,"hour"=model.data.bin$hour))
+data.b <- as.data.table(cbind(data,"hour"=model.data.bin$hour))
+data.c <- as.data.table(cbind(data,"hour"=model.data.bin$hour))
+
+data.b[egk >= 1.91918 & ((hour >= 5 & hour < 9) | (hour >= 14 & hour < 20)) & speed > -0.05173123, speed := -0.05173123] #note values for egk and speed are on the transformed scale
+#range(data.b[egk >= 2.324645 & ((hour >= 6 & hour < 9) | (hour >= 17 & hour < 20)), speed])
+
+data.c[speed > 0.3537339, egk := egk-log(2)] #note values for egk and speed are on the transformed scale
+#range(data.c[speed > 0.1714123, egk])
+
+manage.a <- sum(exp(predict(coll.glm, data.a, type="link")))*nrow(data.a)
+
+manage.b <- sum(exp(predict(coll.glm, data.b, type="link")))*nrow(data.b)
+
+manage.c <- sum(exp(predict(coll.glm, data.c, type="link")))*nrow(data.a)
