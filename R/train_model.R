@@ -1220,12 +1220,9 @@ perform.glm.1000 <- cbind("full_model"=signif(perform.glm, digits=4)[c(1:3,11:17
                           "cv_model_rhi"=signif(apply(perform.glm.cv,1,range), digits=4)[2,c(1:3,11:17)]
                           )
 
-save(perform.glm,file="output/perform_glm")
+save(perform.glm.cv,file="output/perform_glm_cv")
 
-write.csv(perform.glm.1000,"output/coll_perform.csv",row.names=FALSE)
-
-
-
+write.csv(perform.glm.1000,"output/perform_glm_1000.csv",row.names=FALSE)
 
 #val.pred.glm <- predict(coll.glm, test[[2]], type="link")  #Make predictions with regression model fit on link scale
 

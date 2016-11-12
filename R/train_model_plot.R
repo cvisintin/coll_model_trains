@@ -563,37 +563,15 @@ dev.off()
 
 #####################################
 
-credplot.gg <- function(d){
-  # d is a data frame with 4 columns
-  # d$x gives variable names
-  # d$y gives center point
-  # d$ylo gives lower limits
-  # d$yhi gives upper limits
-  require(ggplot2)
-  p <- ggplot(d, aes(x=x, y=y, ymin=ylo, ymax=yhi)) +
-    geom_pointrange() +
-    geom_hline(yintercept = 0, linetype=2) +
-    coord_flip() +
-    xlab('Test Metric') +
-    ylab('Value') +
-    theme_bw() +
-    theme(legend.key = element_blank()) +
-    theme(plot.margin=unit(c(.5,0,.1,.1),"cm")) +
-    theme(axis.title.x = element_text(margin=unit(c(.3,0,0,0),"cm"))) +
-    theme(axis.title.y = element_text(margin=unit(c(0,.3,0,0),"cm"))) +
-    theme(panel.grid.major = element_line(size=0.1),panel.grid.minor = element_line(size=0.1)) +
-    theme(text = element_text(size = 10))
-  return(p)
-}
+metrics <- factor(c("Somer's D","ROC","Adj. R2","Brier Score","Intercept","Slope","Emax","S:z","S:p","Eavg"),
+                  levels=c("Dxy","C (ROC)","R2","Brier","Intercept","Slope","Emax","S:z","S:p","Eavg"))
 
 cv_plot <- transform(data.frame(x = factor(rownames(perform.glm.1000),levels=rev(unique(rownames(perform.glm.1000)))), y = perform.glm.1000[, 2], y_orig = perform.glm.1000[, 1]),
                   ylo=y-(2*perform.glm.1000[, 3]),
                   yhi=y+(2*perform.glm.1000[, 3])
                   )
 
-credplot.gg(test)
-
-png('figs/validate.png', pointsize = 6, res=300, width = 1100, height = 900, bg='transparent')
+png('figs/validate.png', pointsize = 6, res=300, width = 900, height = 900, bg='transparent')
 p <- ggplot(cv_plot, aes(x=x, y=y, ymin=ylo, ymax=yhi)) +
   geom_pointrange(size = 0.1) +
   geom_hline(yintercept = 0, linetype=2, size=0.2) +
