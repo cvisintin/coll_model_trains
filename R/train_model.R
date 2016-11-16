@@ -1074,16 +1074,6 @@ data <- data.frame("y"=model.data.bin$coll,
            "kilometre"=log(model.data.bin$length)
            )
 
-data2 <- data.frame("y"=model.data.bin$coll,
-                   "egk"=rescale(log(model.data.bin$egk)),
-                   "trains"=rescale(log(model.data.bin$trains)),
-                   "speed"=rescale(log(model.data.bin$speed)),
-                   "light"=rescale(model.data.bin$light),
-                   "light2"=rescale(model.data.bin$light2),
-                   "dawnordusk"=rescale(model.data.bin$dawnordusk),
-                   "kilometre"=log(model.data.bin$length)
-)
-
 range(cor(data[,1:8])[cor(data[,1:8])!=1])
 
 rstan_options (auto_write=TRUE)
@@ -1104,14 +1094,11 @@ coll.glm <- glm(formula=y ~ egk + trains + speed + light + light2 + dawnordusk,
            family=binomial(link="cloglog"),
            data=data)
 
-coll.glm2 <- glm(formula=y ~ egk + trains + speed + light + light2 + dawnordusk,
-                offset=kilometre,
-                family=binomial(link="cloglog"),
-                data=data2)
-
 summary(coll.glm)
 
-perform.glm <- val.prob(p=predict(coll.glm, data, type="response"), y=data$y, logistic.cal=FALSE, pl=FALSE)
+save(coll.glm, file="output/coll_glm")
+
+#perform.glm <- val.prob(p=predict(coll.glm, data, type="response"), y=data$y, logistic.cal=FALSE, pl=FALSE)
 
 # LogLoss(data$y,predict(coll.glm, data, type="response"))
 # #0.009473507
@@ -1127,20 +1114,20 @@ perform.glm <- val.prob(p=predict(coll.glm, data, type="response"), y=data$y, lo
 
 #####################cross validation#######################
 
-split_into_kfolds <- function(data, k=10) {
-  # make dataset an even multiple of 10
-  data <- data[seq_len(floor(nrow(data) / k) * k), ]
-  # execute the split
-  # use an ordered vector so that all species distributed
-  # approx. equally across groups
-  fold <- rep(seq_len(k), nrow(data)/k)
-  split(data, fold)
-}
-
-LogLoss <- function(actual, predicted, eps=0.00001) {
-  predicted <- pmin(pmax(predicted, eps), 1-eps)
-  -1/length(actual)*(sum(actual*log(predicted)+(1-actual)*log(1-predicted)))
-}
+# split_into_kfolds <- function(data, k=10) {
+#   # make dataset an even multiple of 10
+#   data <- data[seq_len(floor(nrow(data) / k) * k), ]
+#   # execute the split
+#   # use an ordered vector so that all species distributed
+#   # approx. equally across groups
+#   fold <- rep(seq_len(k), nrow(data)/k)
+#   split(data, fold)
+# }
+# 
+# LogLoss <- function(actual, predicted, eps=0.00001) {
+#   predicted <- pmin(pmax(predicted, eps), 1-eps)
+#   -1/length(actual)*(sum(actual*log(predicted)+(1-actual)*log(1-predicted)))
+# }
 
 roc <- function (obsdat, preddat){
   if (length(obsdat) != length(preddat)) 
@@ -1189,8 +1176,14 @@ perform.glm.cv <- foreach(i = 1:R, .combine=cbind) %do% {
                offset=kilometre,
                family=binomial(link="cloglog"),
                data=data.train)
-  
-    val.prob(p=predict(fit, data.test, type="response"), y=data.test$y, logistic.cal=FALSE, pl=FALSE)
+    
+    y <- data.test$y
+    p <- predict(fit, data.test, type="response")
+    calib <- glm(y~log(p), family=binomial(link=cloglog))
+    roc <- roc(y,p)
+    rbind(calib_int=calib$coefficients[1], calib_slope=calib$coefficients[2], roc)
+    
+    #val.prob(p=predict(fit, data.test, type="response"), y=data.test$y, logistic.cal=FALSE, pl=FALSE)
     # c(coef(fit),
     #   summary(fit)$coefficients[, 2],
     #   summary(coll.glm)$coefficients[, 4],
@@ -1200,7 +1193,7 @@ perform.glm.cv <- foreach(i = 1:R, .combine=cbind) %do% {
     #   summary(glm(data.test$y ~ predict(fit, data.test, type="link"), family = binomial(link = "cloglog")))$coefficients[, 4]
     # )
   }
-  colnames(glm.cv) <- sapply(colnames(glm.cv), function(x) paste0(x,".",i))
+  colnames(glm.cv) <- paste0(i,".",seq(1,N,1))
   glm.cv
 }
 )
@@ -1228,33 +1221,35 @@ perform.glm.cv <- foreach(i = 1:R, .combine=cbind) %do% {
 #                         "cv_model"=paste0(signif(apply(perform.glm.cv,1,mean)[c(1:3,11:17)], digits=4)," (",signif(apply(perform.glm.cv,1,sd)[c(1:3,11:17)], digits=4),"; ",signif(apply(perform.glm.cv,1,range), digits=4)[1,c(1:3,11:17)],":",signif(apply(perform.glm.cv,1,range), digits=4)[2,c(1:3,11:17)] ,")")
 # )
 
-perform.glm.1000 <- cbind("full_model"=signif(perform.glm, digits=4)[c(2,3,1,11:13)],
-                          "cv_model_mean"=signif(apply(perform.glm.cv,1,mean)[c(2,3,1,11:13)], digits=4),
-                          "cv_model_sd"=signif(apply(perform.glm.cv,1,sd)[c(2,3,1,11:13)], digits=4),
-                          "cv_model_rlo"=signif(apply(perform.glm.cv,1,range), digits=4)[1,c(2,3,1,11:13)],
-                          "cv_model_rhi"=signif(apply(perform.glm.cv,1,range), digits=4)[2,c(2,3,1,11:13)]
-                          )
+# perform.glm.1000 <- cbind("full_model"=signif(perform.glm, digits=4)[c(2,3,1,11:13)],
+#                           "cv_model_mean"=signif(apply(perform.glm.cv,1,mean)[c(2,3,1,11:13)], digits=4),
+#                           "cv_model_sd"=signif(apply(perform.glm.cv,1,sd)[c(2,3,1,11:13)], digits=4),
+#                           "cv_model_rlo"=signif(apply(perform.glm.cv,1,range), digits=4)[1,c(2,3,1,11:13)],
+#                           "cv_model_rhi"=signif(apply(perform.glm.cv,1,range), digits=4)[2,c(2,3,1,11:13)]
+#                           )
 
 save(perform.glm.cv,file="output/perform_glm_cv")
-
-write.csv(perform.glm.1000,"output/perform_glm_1000.csv",row.names=FALSE)
 
 #val.pred.glm <- predict(coll.glm, test[[2]], type="link")  #Make predictions with regression model fit on link scale
 
 #summary(glm(test[[2]]$y ~ val.pred.glm, family = binomial(link = "cloglog")))  #slope is close to ine therefore model is well calibrated to external data after accounting for multiplicative differences
 
-data.a <- as.data.table(cbind(data,"hour"=model.data.bin$hour))
-data.b <- as.data.table(cbind(data,"hour"=model.data.bin$hour))
-data.c <- as.data.table(cbind(data,"hour"=model.data.bin$hour))
+data.a <- as.data.table(data)
+data.b <- as.data.table(cbind(data,"hour"=model.data.bin$hour, "id"=model.data.bin$id, "trips"=model.data.bin$trains))
+data.c <- as.data.table(cbind(data,"hour"=model.data.bin$hour, "id"=model.data.bin$id, "length"=model.data.bin$length))
 
-data.b[egk >= 1.91918 & ((hour >= 5 & hour < 9) | (hour >= 14 & hour < 20)) & speed > -0.05173123, speed := -0.05173123] #note values for egk and speed are on the transformed scale
+data.b[egk >= 1.91918 & ((hour >= 5 & hour < 9) | (hour >= 16 & hour < 20)) & speed > -0.05173123, mean(trips), by="id"]
+sum(data.b[egk >= 1.91918 & ((hour >= 5 & hour < 9) | (hour >= 16 & hour < 20)) & speed > -0.05173123, mean(trips), by="id"]$V1)
+data.b[egk >= 1.91918 & ((hour >= 5 & hour < 9) | (hour >= 16 & hour < 20)) & speed > -0.05173123, speed := -0.05173123] #note values for egk and speed are on the transformed scale
 #range(data.b[egk >= 2.324645 & ((hour >= 6 & hour < 9) | (hour >= 17 & hour < 20)), speed])
 
+data.c[speed > 0.3537339, .N, by="id"]
+sum(data.c[speed > 0.3537339, mean(length), by="id"]$V1)
 data.c[speed > 0.3537339, egk := egk-log(2)] #note values for egk and speed are on the transformed scale
 #range(data.c[speed > 0.1714123, egk])
 
-manage.a <- sum(exp(predict(coll.glm, data.a, type="link")))*nrow(data.a)
+manage.a <- sum(predict(coll.glm, data.a, type="response"))
 
-manage.b <- sum(exp(predict(coll.glm, data.b, type="link")))*nrow(data.b)
+manage.b <- sum(predict(coll.glm, data.b, type="response"))
 
-manage.c <- sum(exp(predict(coll.glm, data.c, type="link")))*nrow(data.a)
+manage.c <- sum(predict(coll.glm, data.c, type="response"))
