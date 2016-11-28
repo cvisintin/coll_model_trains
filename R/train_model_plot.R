@@ -647,13 +647,13 @@ metrics <- factor(c("Intercept","Slope","ROC"),
                   levels=rev(c("Intercept","Slope","ROC")))
 
 cv_plot <- transform(data.frame(x = metrics, y = perform.glm.1000[, 2], y_orig = perform.glm.1000[, 1]),
-                  ylo=perform.glm.1000[, 4],
-                  yhi=perform.glm.1000[, 5]
+                  ylo=perform.glm.1000[, 2] - 2*perform.glm.1000[, 3],
+                  yhi=perform.glm.1000[, 2] + 2*perform.glm.1000[, 3]
                   )
 
 png('figs/validate.png', pointsize = 6, res=300, width = 900, height = 900, bg='transparent')
 p <- ggplot() +
-  geom_pointrange(cv_plot, aes(x=x, y=y, ymin=ylo, ymax=yhi), size = 0.1) +
+  geom_pointrange(data=cv_plot, aes(x=x, y=y, ymin=ylo, ymax=yhi), size = 0.1) +
   #geom_hline(yintercept = 0, linetype=2, size=0.2) +
   coord_flip() +
   ylab("Value") +
@@ -664,7 +664,7 @@ p <- ggplot() +
   theme(axis.title.y = element_text(margin=unit(c(0,.3,0,0),"cm"))) +
   theme(panel.grid.major = element_line(size=0.1),panel.grid.minor = element_line(size=0.1)) +
   theme(text = element_text(size = 10))
-p + geom_point(aes(x=x, y=y_orig), size = 2, shape=1, inherit.aes=FALSE) +
+p + geom_point(data=cv_plot, aes(x=x, y=y_orig), size = 2, shape=1, inherit.aes=FALSE) +
   geom_segment(aes(x = 2.5, y = 0, xend = 3.5, yend = 0), linetype=2, size=0.1) +
   geom_segment(aes(x = 0.5, y = 1, xend = 2.5, yend = 1), linetype=2, size=0.1)
 dev.off()
