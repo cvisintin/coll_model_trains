@@ -1064,15 +1064,25 @@ csvfiles <- dir('/home/casey/cmdstan-2.12.0/examples/bern_cloglog/', pattern = '
 
 coll.stan.bin <- read_stan_csv(csvfiles)
 
+###############################################################
+
 data <- data.frame("y"=model.data.bin$coll,
-           "egk"=log(model.data.bin$egk)-mean(log(model.data.bin$egk)),
-           "trains"=log(model.data.bin$trains)-mean(log(model.data.bin$trains)),
-           "speed"=log(model.data.bin$speed)-mean(log(model.data.bin$speed)),
-           "light"=model.data.bin$light-mean(model.data.bin$light),
-           "light2"=model.data.bin$light2-mean(model.data.bin$light2),
-           "dawnordusk"=model.data.bin$dawnordusk-mean(model.data.bin$dawnordusk),
-           "kilometre"=log(model.data.bin$length)
-           )
+                   "egk"=model.data.bin$egk,
+                   "trains"=model.data.bin$trains,
+                   "speed"=model.data.bin$speed,
+                   "egk_lc"=log(model.data.bin$egk)-mean(log(model.data.bin$egk)),
+                   "trains_lc"=log(model.data.bin$trains)-mean(log(model.data.bin$trains)),
+                   "speed_lc"=log(model.data.bin$speed)-mean(log(model.data.bin$speed)),
+                   "light"=model.data.bin$light-mean(model.data.bin$light),
+                   "light2"=model.data.bin$light2-mean(model.data.bin$light2),
+                   "dawnordusk"=model.data.bin$dawnordusk-mean(model.data.bin$dawnordusk),
+                   "kilometre"=log(model.data.bin$length)
+                    )
+
+data <- cbind(data,model.data.bin[,c(6,8:9),with=FALSE])
+
+save(data, file="data/coll_glm_data")
+write.csv(data, file="data/coll_glm_data.csv", row.names=F)
 
 range(cor(data[,1:8])[cor(data[,1:8])!=1])
 
@@ -1089,7 +1099,7 @@ coll.stan.bin <- stan_glm(formula=y ~ egk + trains + speed + light + light2 + da
 
 cross.val <- kfold(coll.stan.bin, K = 10)
 
-coll.glm <- glm(formula=y ~ egk + trains + speed + light + light2 + dawnordusk,
+coll.glm <- glm(formula=y ~ egk_lc + trains_lc + speed_lc + light + light2 + dawnordusk,
            offset=kilometre,
            family=binomial(link="cloglog"),
            data=data)
@@ -1097,6 +1107,81 @@ coll.glm <- glm(formula=y ~ egk + trains + speed + light + light2 + dawnordusk,
 summary(coll.glm)
 
 save(coll.glm, file="output/coll_glm")
+
+#sim.res <- simulateResiduals(coll.glm)
+#plotSimulatedResiduals(sim.res)
+
+#binnedplot(predict(coll.glm, type="response"),resid(coll.glm, type="response"))
+
+#Randomised quantile residuals - Dunn & Smyth 1996
+prob <- predict(coll.glm, type = 'response')
+n <- 5000
+
+registerDoMC(cores=detectCores()-1)
+
+system.time(
+  coll.resid <- foreach(i = 1:nrow(data), .combine=c) %dopar% {
+    simulations.c = c()
+    while (length(simulations.c) < 10000 &
+           all(simulations.c != coll.glm$y[i])) {
+      set.seed(123+i)
+      simulations.c = c(simulations.c, rbinom(n, 1, prob[i]))
+    }
+    if (!any(simulations.c == coll.glm$y[i]))
+      warning(sprintf('datapoint %i had no valid samples', i))
+    
+    # add jitter
+    set.seed(123+i)
+    fuzzy.y <- coll.glm$y[i] + runif(1, -0.5, 0.5)
+    set.seed(123+i)
+    fuzzy.simulations <- simulations.c + runif(n, -0.5, 0.5)
+    
+    # make sure ecdf doesn't go to 1 or 0
+    sim.limits <- range(sort(unique(fuzzy.simulations))[-c(1,length(unique(fuzzy.simulations)))])
+    fuzzy.y <- pmin(pmax(fuzzy.y, sim.limits[1]), sim.limits[2])
+    
+    ecdf(fuzzy.simulations)(fuzzy.y)
+  }
+) ###214 second runtime
+
+save(coll.resid,file="output/coll_resid")
+
+coll.resid.norm <- qnorm(coll.resid)
+
+png('figs/brq_prob.png', pointsize = 9, res=300, width = 1200, height = 900, bg='transparent')
+  par(mar=c(3.0,3.5,1.5,0.5))
+  binnedplot(prob, coll.resid.norm, ylab="RQ Residual", xlab="", main='', cex.axis=0.6, las=1, mgp=c(2.5,1,0), cex.lab=0.8, xaxt='n')
+  axis(1, cex.axis=0.6, mgp=c(2.5,0.5,0))
+  title(xlab='Estimated Pr of Collision', mgp=c(1.8,0.5,0), cex.lab=0.8)
+dev.off()
+
+png('figs/brq_egk.png', pointsize = 9, res=300, width = 900, height = 900, bg='transparent')
+  par(mar=c(3.0,3.5,1.5,0.5))
+  binnedplot(data$egk, coll.resid.norm, ylab="RQ Residual", xlab="", main='', cex.axis=0.6, las=1, mgp=c(2.5,1,0), cex.lab=0.8, xaxt='n')
+  axis(1, cex.axis=0.6, mgp=c(2.5,0.5,0))
+  title(xlab='Kangaroo Occurrence', mgp=c(1.8,0.5,0), cex.lab=0.8)
+dev.off()
+
+png('figs/brq_trains.png', pointsize = 9, res=300, width = 900, height = 900, bg='transparent')
+  par(mar=c(3.0,3.5,1.5,0.5))  
+  binnedplot(data$trains, coll.resid.norm, ylab="RQ Residual", xlab="", main='', cex.axis=0.6, las=1, mgp=c(2.5,1,0), cex.lab=0.8, xaxt='n')
+  axis(1, cex.axis=0.6, mgp=c(2.5,0.5,0))
+  title(xlab='Number of Trains', mgp=c(1.8,0.5,0), cex.lab=0.8)
+dev.off()
+
+png('figs/brq_speed.png', pointsize = 9, res=300, width = 900, height = 900, bg='transparent')
+  par(mar=c(3.0,3.5,1.5,0.5))
+  binnedplot(data$speed, coll.resid.norm, ylab="RQ Residual", xlab="", main='', cex.axis=0.6, las=1, mgp=c(2.5,1,0), cex.lab=0.8, xaxt='n')
+  axis(1, cex.axis=0.6, mgp=c(2.5,0.5,0))
+  title(xlab='Train Speed', mgp=c(1.8,0.5,0), cex.lab=0.8)
+dev.off()
+
+png('figs/brq_hour.png', pointsize = 9, res=300, width = 900, height = 900, bg='transparent')
+  par(mar=c(3.0,3.5,1.5,0.5))
+  binnedplot(data$hour, coll.resid.norm, ylab="RQ Residual", xlab="", main='', cex.axis=0.6, las=1, mgp=c(2.5,1,0), cex.lab=0.8, xaxt='n')
+  axis(1, cex.axis=0.6, mgp=c(2.5,0.5,0))
+  title(xlab='Hour', mgp=c(1.8,0.5,0), cex.lab=0.8)
+dev.off()
 
 #perform.glm <- val.prob(p=predict(coll.glm, data, type="response"), y=data$y, logistic.cal=FALSE, pl=FALSE)
 

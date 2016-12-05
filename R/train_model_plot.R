@@ -7,6 +7,7 @@ require(plyr)
 #perform.glm.1000 <- read.csv("output/perform_glm_1000.csv", header=T)
 load(file="output/coll_glm")
 load(file="output/perform_glm_cv")
+load(file="data/coll_glm_data")
 
 roc <- function (obsdat, preddat){
   if (length(obsdat) != length(preddat)) 
@@ -74,8 +75,9 @@ model.coefs.ci <- confint(coll.glm)#cbind(coef(coll.glm) - summary(fit)$coeffici
 names(data)[1]
 
 png('figs/egk.png', pointsize = 12, res=300, width = 900, height = 900, bg='transparent')
+x <- seq(0,1,1/nrow(data))[-(1:1)]
 ggplot(data) +
-  geom_line(aes(x=seq(0,1,1/nrow(data))[-(1:1)],
+  geom_line(aes(x=x,
                 y=invcloglog(
                   model.coefs[1] +
                     model.coefs[2]*(log(x)-mean(log(x))) +
@@ -88,7 +90,7 @@ ggplot(data) +
                 )
   ),
   size=0.5) +
-  geom_ribbon(aes(x=seq(0,1,1/nrow(data))[-(1:1)],
+  geom_ribbon(aes(x=x,
                   ymin=invcloglog(
                     model.coefs[1] +
                       model.coefs.ci[2,1]*(log(x)-mean(log(x))) +
@@ -126,8 +128,9 @@ dev.off()
 
 
 png('figs/trains.png', pointsize = 12, res=300, width = 900, height = 900, bg='transparent')
+x <- seq(0,60,60/nrow(data))[-(1:1)]
 ggplot(data) +
-  geom_line(aes(x=seq(0,60,60/nrow(data))[-(1:1)],
+  geom_line(aes(x=x,
                 y=invcloglog(
                   model.coefs[1] +
                     model.coefs[2]*mean(egk) +
@@ -140,7 +143,7 @@ ggplot(data) +
                 )
   ),
   size=0.5) +
-  geom_ribbon(aes(x=seq(0,60,60/nrow(data))[-(1:1)],
+  geom_ribbon(aes(x=x,
                   ymin=invcloglog(
                     model.coefs[1] +
                       model.coefs[2]*mean(egk) +
@@ -178,8 +181,9 @@ dev.off()
 
 
 png('figs/speed.png', pointsize = 12, res=300, width = 900, height = 900, bg='transparent')
-ggplot(data = data) +
-  geom_line(aes(x=seq(10,160,150/nrow(data))[1:nrow(data)],
+x <- seq(10,160,150/nrow(data))[1:nrow(data)]
+ggplot(data) +
+  geom_line(aes(x=x,
                 y=invcloglog(
                   model.coefs[1] +
                     model.coefs[2]*mean(egk) +
@@ -192,7 +196,7 @@ ggplot(data = data) +
                 )
   ),
   size=0.5) +
-  geom_ribbon(aes(x=seq(10,160,150/nrow(data))[1:nrow(data)],
+  geom_ribbon(aes(x=x,
                   ymin=invcloglog(
                     model.coefs[1] +
                       model.coefs[2]*mean(egk) +
@@ -228,11 +232,10 @@ ggplot(data = data) +
 #scale_y_continuous(limits = c(0,.012), breaks = seq(0,.012,.0012))
 dev.off()
 
-data <- cbind(data,model.data.bin[,c(6,8:9),with=FALSE])
-
 png('figs/hour.png', pointsize = 12, res=300, width = 900, height = 900, bg='transparent')
-ggplot(data = data) +
-  geom_line(aes(x=seq(0,24,24/nrow(data))[-(1:1)],
+x <- seq(0,24,24/nrow(data))[-(1:1)]
+ggplot(data) +
+  geom_smooth(aes(x=x,
                 y=invcloglog(
                   model.coefs[1] +
                     model.coefs[2]*mean(egk) +
@@ -244,8 +247,8 @@ ggplot(data = data) +
                     mean(kilometre)
                 )
   ),
-  size=0.5) +
-  geom_ribbon(aes(x=seq(0,24,24/nrow(data))[-(1:1)],
+  size=0.5, col='black') +
+  geom_ribbon(aes(x=x,
                   ymin=invcloglog(
                     model.coefs[1] +
                       model.coefs[2]*mean(egk) +
