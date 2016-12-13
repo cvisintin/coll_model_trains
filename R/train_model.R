@@ -1079,7 +1079,7 @@ data <- data.frame("y"=model.data.bin$coll,
                    "kilometre"=log(model.data.bin$length)
                     )
 
-data <- cbind(data,model.data.bin[,c(6,8:9),with=FALSE])
+data <- cbind(data,model.data.bin[,c(6,10:11),with=FALSE])
 
 save(data, file="data/coll_glm_data")
 write.csv(data, file="data/coll_glm_data.csv", row.names=F)
@@ -1150,23 +1150,23 @@ coll.resid.norm <- qnorm(coll.resid)
 
 png('figs/brq_prob.png', pointsize = 9, res=300, width = 1200, height = 900, bg='transparent')
   par(mar=c(3.0,3.5,1.5,0.5))
-  binnedplot(prob, coll.resid.norm, ylab="RQ Residual", xlab="", main='', cex.axis=0.6, las=1, mgp=c(2.5,1,0), cex.lab=0.8, xaxt='n')
+  binnedplot(log(prob), coll.resid.norm, ylab="RQ Residual", xlab="", main='', cex.axis=0.6, las=1, mgp=c(2.5,1,0), cex.lab=0.8, xaxt='n')
   axis(1, cex.axis=0.6, mgp=c(2.5,0.5,0))
-  title(xlab='Estimated Pr of Collision', mgp=c(1.8,0.5,0), cex.lab=0.8)
+  title(xlab='Estimated Pr of Collision (log-transformed)', mgp=c(1.8,0.5,0), cex.lab=0.8)
 dev.off()
 
 png('figs/brq_egk.png', pointsize = 9, res=300, width = 900, height = 900, bg='transparent')
   par(mar=c(3.0,3.5,1.5,0.5))
-  binnedplot(data$egk, coll.resid.norm, ylab="RQ Residual", xlab="", main='', cex.axis=0.6, las=1, mgp=c(2.5,1,0), cex.lab=0.8, xaxt='n')
+  binnedplot(log(data$egk), coll.resid.norm, ylab="RQ Residual", xlab="", main='', cex.axis=0.6, las=1, mgp=c(2.5,1,0), cex.lab=0.8, xaxt='n')
   axis(1, cex.axis=0.6, mgp=c(2.5,0.5,0))
-  title(xlab='Kangaroo Occurrence', mgp=c(1.8,0.5,0), cex.lab=0.8)
+  title(xlab='Kangaroo Occurrence (log-transformed)', mgp=c(1.8,0.5,0), cex.lab=0.8)
 dev.off()
 
 png('figs/brq_trains.png', pointsize = 9, res=300, width = 900, height = 900, bg='transparent')
   par(mar=c(3.0,3.5,1.5,0.5))  
-  binnedplot(data$trains, coll.resid.norm, ylab="RQ Residual", xlab="", main='', cex.axis=0.6, las=1, mgp=c(2.5,1,0), cex.lab=0.8, xaxt='n')
+  binnedplot(log(data$trains), coll.resid.norm, ylab="RQ Residual", xlab="", main='', cex.axis=0.6, las=1, mgp=c(2.5,1,0), cex.lab=0.8, xaxt='n')
   axis(1, cex.axis=0.6, mgp=c(2.5,0.5,0))
-  title(xlab='Number of Trains', mgp=c(1.8,0.5,0), cex.lab=0.8)
+  title(xlab='Number of Trains (log-transformed)', mgp=c(1.8,0.5,0), cex.lab=0.8)
 dev.off()
 
 png('figs/brq_speed.png', pointsize = 9, res=300, width = 900, height = 900, bg='transparent')
@@ -1281,7 +1281,7 @@ perform.glm.cv <- foreach(i = 1:R, .combine=cbind) %do% {
   colnames(glm.cv) <- paste0(i,".",seq(1,N,1))
   glm.cv
 }
-)
+) # 1855 seconds
 
 # perform.glm.30 <- cbind("coef"=signif(apply(perform.glm[1:7,], 1, mean), digits=4),
 #                      "coef_sd"=signif(apply(perform.glm[1:7,], 1, sd), digits=4),
@@ -1323,14 +1323,14 @@ data.a <- as.data.table(data)
 data.b <- as.data.table(cbind(data,"hour"=model.data.bin$hour, "id"=model.data.bin$id, "trips"=model.data.bin$trains))
 data.c <- as.data.table(cbind(data,"hour"=model.data.bin$hour, "id"=model.data.bin$id, "length"=model.data.bin$length))
 
-data.b[egk >= 1.91918 & ((hour >= 5 & hour < 9) | (hour >= 16 & hour < 20)) & speed > -0.05173123, mean(trips), by="id"]
-sum(data.b[egk >= 1.91918 & ((hour >= 5 & hour < 9) | (hour >= 16 & hour < 20)) & speed > -0.05173123, mean(trips), by="id"]$V1)
-data.b[egk >= 1.91918 & ((hour >= 5 & hour < 9) | (hour >= 16 & hour < 20)) & speed > -0.05173123, speed := -0.05173123] #note values for egk and speed are on the transformed scale
+data.b[egk_lc >= 1.91918 & ((hour >= 5 & hour < 9) | (hour >= 16 & hour < 20)) & speed_lc > -0.05173123, mean(trips), by="id"]
+sum(data.b[egk_lc >= 1.91918 & ((hour >= 5 & hour < 9) | (hour >= 16 & hour < 20)) & speed_lc > -0.05173123, mean(trips), by="id"]$V1)
+data.b[egk_lc >= 1.91918 & ((hour >= 5 & hour < 9) | (hour >= 16 & hour < 20)) & speed > -0.05173123, speed_lc := -0.05173123] #note values for egk and speed are on the transformed scale
 #range(data.b[egk >= 2.324645 & ((hour >= 6 & hour < 9) | (hour >= 17 & hour < 20)), speed])
 
-data.c[speed > 0.3537339, .N, by="id"]
-sum(data.c[speed > 0.3537339, mean(length), by="id"]$V1)
-data.c[speed > 0.3537339, egk := egk-log(2)] #note values for egk and speed are on the transformed scale
+data.c[speed_lc > 0.3537339, .N, by="id"]
+sum(data.c[speed_lc > 0.3537339, mean(length), by="id"]$V1)
+data.c[speed_lc > 0.3537339, egk_lc := egk_lc-log(2)] #note values for egk and speed are on the transformed scale
 #range(data.c[speed > 0.1714123, egk])
 
 manage.a <- sum(predict(coll.glm, data.a, type="response"))
