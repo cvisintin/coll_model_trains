@@ -1,6 +1,7 @@
 require(ggplot2)
 require(rstan)
 require(plyr)
+require(plotROC)
 
 # plotPal <- c("#94d1c7")
 
@@ -81,8 +82,8 @@ ggplot(data) +
                 y=invcloglog(
                   model.coefs[1] +
                     model.coefs[2]*(log(x)-mean(log(x))) +
-                    model.coefs[3]*mean(trains) +
-                    model.coefs[4]*mean(speed) +
+                    model.coefs[3]*mean(trains_lc) +
+                    model.coefs[4]*mean(speed_lc) +
                     model.coefs[5]*mean(light) +
                     model.coefs[6]*mean(light2) +
                     model.coefs[7]*mean(dawnordusk) +
@@ -94,8 +95,8 @@ ggplot(data) +
                   ymin=invcloglog(
                     model.coefs[1] +
                       model.coefs.ci[2,1]*(log(x)-mean(log(x))) +
-                      model.coefs[3]*mean(trains) +
-                      model.coefs[4]*mean(speed) +
+                      model.coefs[3]*mean(trains_lc) +
+                      model.coefs[4]*mean(speed_lc) +
                       model.coefs[5]*mean(light) +
                       model.coefs[6]*mean(light2) +
                       model.coefs[7]*mean(dawnordusk) +
@@ -104,8 +105,8 @@ ggplot(data) +
                   ymax=invcloglog(
                     model.coefs[1] +
                       model.coefs.ci[2,2]*(log(x)-mean(log(x))) +
-                      model.coefs[3]*mean(trains) +
-                      model.coefs[4]*mean(speed) +
+                      model.coefs[3]*mean(trains_lc) +
+                      model.coefs[4]*mean(speed_lc) +
                       model.coefs[5]*mean(light) +
                       model.coefs[6]*mean(light2) +
                       model.coefs[7]*mean(dawnordusk) +
@@ -133,9 +134,9 @@ ggplot(data) +
   geom_line(aes(x=x,
                 y=invcloglog(
                   model.coefs[1] +
-                    model.coefs[2]*mean(egk) +
+                    model.coefs[2]*mean(egk_lc) +
                     model.coefs[3]*(log(x)-mean(log(x))) +
-                    model.coefs[4]*mean(speed) +
+                    model.coefs[4]*mean(speed_lc) +
                     model.coefs[5]*mean(light) +
                     model.coefs[6]*mean(light2) +
                     model.coefs[7]*mean(dawnordusk) +
@@ -146,9 +147,9 @@ ggplot(data) +
   geom_ribbon(aes(x=x,
                   ymin=invcloglog(
                     model.coefs[1] +
-                      model.coefs[2]*mean(egk) +
+                      model.coefs[2]*mean(egk_lc) +
                       model.coefs.ci[3,1]*(log(x)-mean(log(x))) +
-                      model.coefs[4]*mean(speed) +
+                      model.coefs[4]*mean(speed_lc) +
                       model.coefs[5]*mean(light) +
                       model.coefs[6]*mean(light2) +
                       model.coefs[7]*mean(dawnordusk) +
@@ -156,9 +157,9 @@ ggplot(data) +
                   ),
                   ymax=invcloglog(
                     model.coefs[1] +
-                      model.coefs[2]*mean(egk) +
+                      model.coefs[2]*mean(egk_lc) +
                       model.coefs.ci[3,2]*(log(x)-mean(log(x))) +
-                      model.coefs[4]*mean(speed) +
+                      model.coefs[4]*mean(speed_lc) +
                       model.coefs[5]*mean(light) +
                       model.coefs[6]*mean(light2) +
                       model.coefs[7]*mean(dawnordusk) +
@@ -186,8 +187,8 @@ ggplot(data) +
   geom_line(aes(x=x,
                 y=invcloglog(
                   model.coefs[1] +
-                    model.coefs[2]*mean(egk) +
-                    model.coefs[3]*mean(trains) +
+                    model.coefs[2]*mean(egk_lc) +
+                    model.coefs[3]*mean(trains_lc) +
                     model.coefs[4]*(log(x)-mean(log(x))) +
                     model.coefs[5]*mean(light) +
                     model.coefs[6]*mean(light2) +
@@ -199,8 +200,8 @@ ggplot(data) +
   geom_ribbon(aes(x=x,
                   ymin=invcloglog(
                     model.coefs[1] +
-                      model.coefs[2]*mean(egk) +
-                      model.coefs[3]*mean(trains) +
+                      model.coefs[2]*mean(egk_lc) +
+                      model.coefs[3]*mean(trains_lc) +
                       model.coefs.ci[4,1]*(log(x)-mean(log(x))) +
                       model.coefs[5]*mean(light) +
                       model.coefs[6]*mean(light2) +
@@ -209,8 +210,8 @@ ggplot(data) +
                   ),
                   ymax=invcloglog(
                     model.coefs[1] +
-                      model.coefs[2]*mean(egk) +
-                      model.coefs[3]*mean(trains) +
+                      model.coefs[2]*mean(egk_lc) +
+                      model.coefs[3]*mean(trains_lc) +
                       model.coefs.ci[4,2]*(log(x)-mean(log(x))) +
                       model.coefs[5]*mean(light) +
                       model.coefs[6]*mean(light2) +
@@ -238,9 +239,9 @@ ggplot(data) +
   geom_smooth(aes(x=x,
                 y=invcloglog(
                   model.coefs[1] +
-                    model.coefs[2]*mean(egk) +
-                    model.coefs[3]*mean(trains) +
-                    model.coefs[4]*mean(speed) +
+                    model.coefs[2]*mean(egk_lc) +
+                    model.coefs[3]*mean(trains_lc) +
+                    model.coefs[4]*mean(speed_lc) +
                     model.coefs[5]*(sin((2 * pi * (x - 6)) / 24)-mean(sin((2 * pi * (x - 6)) / 24))) +
                     model.coefs[6]*(sin((2 * pi * (x - 6)) / 24)^2-mean(sin((2 * pi * (x - 6)) / 24)^2)) +
                     model.coefs[7]*(dawn.or.dusk(h=x,dawn=dawn,dusk=dusk)-mean(dawn.or.dusk(h=x,dawn=dawn,dusk=dusk))) +
@@ -251,9 +252,9 @@ ggplot(data) +
   geom_ribbon(aes(x=x,
                   ymin=invcloglog(
                     model.coefs[1] +
-                      model.coefs[2]*mean(egk) +
-                      model.coefs[3]*mean(trains) +
-                      model.coefs[4]*mean(speed) +
+                      model.coefs[2]*mean(egk_lc) +
+                      model.coefs[3]*mean(trains_lc) +
+                      model.coefs[4]*mean(speed_lc) +
                       model.coefs.ci[5,1]*(sin((2 * pi * (x - 6)) / 24)-mean(sin((2 * pi * (x - 6)) / 24))) +
                       model.coefs.ci[6,1]*(sin((2 * pi * (x - 6)) / 24)^2-mean(sin((2 * pi * (x - 6)) / 24)^2)) +
                       model.coefs.ci[7,1]*(dawn.or.dusk(h=x,dawn=dawn,dusk=dusk)-mean(dawn.or.dusk(h=x,dawn=dawn,dusk=dusk))) +
@@ -261,9 +262,9 @@ ggplot(data) +
                   ),
                   ymax=invcloglog(
                     model.coefs[1] +
-                      model.coefs[2]*mean(egk) +
-                      model.coefs[3]*mean(trains) +
-                      model.coefs[4]*mean(speed) +
+                      model.coefs[2]*mean(egk_lc) +
+                      model.coefs[3]*mean(trains_lc) +
+                      model.coefs[4]*mean(speed_lc) +
                       model.coefs.ci[5,2]*(sin((2 * pi * (x - 6)) / 24)-mean(sin((2 * pi * (x - 6)) / 24))) +
                       model.coefs.ci[6,2]*(sin((2 * pi * (x - 6)) / 24)^2-mean(sin((2 * pi * (x - 6)) / 24)^2)) +
                       model.coefs.ci[7,2]*(dawn.or.dusk(h=x,dawn=dawn,dusk=dusk)-mean(dawn.or.dusk(h=x,dawn=dawn,dusk=dusk))) +
