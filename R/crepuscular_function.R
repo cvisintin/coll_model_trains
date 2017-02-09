@@ -58,10 +58,10 @@ diff <- nearerDawn(h)
 
 #par(mfrow = c(2, 1))
 # plot the covariates
-png('figs/crep01.png', pointsize = 9, res=300, width = 900, height = 900, bg='transparent')
-  plot(light ~ h, type = 'l', xaxt='n', xlab='', ylab='', cex.axis=0.6, yaxp=c(-1,1,10), las=1, mgp=c(2.5,1,0), par(mar=c(3.0,3.5,1.5,0.5)), cex.lab=0.8)
+png('figs/crep01.png', pointsize = 10, res=300, width = 900, height = 900, bg='transparent')
+  plot(light ~ h, type = 'l', xaxt='n', xlab='', ylab='', cex.axis=0.6, yaxp=c(-1,1,10), las=1, mgp=c(2.5,1,0), par(mar=c(3.0,2.0,1.5,0.5)), cex.lab=0.8)
   axis(1, cex.axis=0.6, xaxp=c(0,24,24), mgp=c(2.5,0.5,0))
-  title(xlab='HOUR', mgp=c(1.8,0.5,0), cex.lab=0.8)
+  title(xlab='HOUR', mgp=c(1.8,0.5,0), cex.lab=0.8, line = 1.5)
   lines(light2 ~ h, lty = 2)
   lines(diff ~ h, lty = 3)
 dev.off()
@@ -77,7 +77,7 @@ curve <- pr['a'] +
   pr['b2'] * light2 +
   pr['b3'] * diff
 
-png('figs/crep02.png', pointsize = 9, res=300, width = 900, height = 900, bg='transparent')
+png('figs/crep02.png', pointsize = 10, res=300, width = 900, height = 900, bg='transparent')
 plot(exp(curve) ~ h, type = 'l', xaxt='n', xlab='', ylab='RELATIVE ACTIVITY', cex.axis=0.6, las=1, mgp=c(2.5,1,0), par(mar=c(3.0,3.5,1.5,0.5)), cex.lab=0.8)
 axis(1, cex.axis=0.6, xaxp=c(0,24,24), mgp=c(2.5,0.5,0))
 title(xlab='HOUR', mgp=c(1.8,0.5,0), cex.lab=0.8)
@@ -100,14 +100,17 @@ for(i in 1:10){
   set.seed(i)
   draw <- sample(seq(-2.5,2.5,0.1),3)
   curve <- draw[1]*light + draw[2]*light2 + draw[3]*diff
-  png(paste0('figs/crep',i+19,'.png'), pointsize = 9, res=300, width = 900, height = 900, bg='transparent')
-  plot(exp(curve) ~ h, type = 'l', xaxt='n', xlab='', ylab='RELATIVE ACTIVITY', cex.axis=0.6, las=1, mgp=c(2.5,1,0), par(mar=c(3.0,3.5,1.5,0.5)), cex.lab=0.8, cex.main=0.8, main=paste0('g1=',draw[1],' g2=',draw[2],' g3=',draw[3]))
+  png(paste0('figs/crep',i+19,'.png'), pointsize = 10, res=300, width = 900, height = 900, bg='transparent')
+  plot(exp(curve) ~ h, type = 'l', xaxt='n', xlab='', ylab='', cex.axis=0.6, las=1, mgp=c(2.5,1,0), par(mar=c(3.0,3.5,1.5,0.5)), cex.lab=0.8, cex.main=0.8, main=paste0('g1=',draw[1],'  g2=',draw[2],'  g3=',draw[3]))
   axis(1, cex.axis=0.6, xaxp=c(0,24,24), mgp=c(2.5,0.5,0))
-  title(xlab='HOUR', mgp=c(1.8,0.5,0), cex.lab=0.8)
+  title(xlab='HOUR', mgp=c(1.8,0.5,0), cex.lab=0.8, line = 1.5)
+  mtext(side = 2, "RELATIVE ACTIVITY", line = 2, cex=0.8)
   dev.off()
 }
 
 
 # plot a relative collision rate for these parameters & covariates
 plot(exp(curve) ~ h, type = 'l')
+
+#####################Plots for VicBio Conf talk######################
 

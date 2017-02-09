@@ -1145,38 +1145,39 @@ system.time(
 ) ###214 second runtime
 
 save(coll.resid,file="output/coll_resid")
+#load("output/coll_resid")
 
 coll.resid.norm <- qnorm(coll.resid)
 
-png('figs/brq_prob.png', pointsize = 9, res=300, width = 1200, height = 900, bg='transparent')
+png('figs/brq_prob.png', pointsize = 12, res=300, width = 1200, height = 900, bg='transparent')
   par(mar=c(3.0,3.5,1.5,0.5))
   binnedplot(log(prob), coll.resid.norm, ylab="RQ Residual", xlab="", main='', cex.axis=0.6, las=1, mgp=c(2.5,1,0), cex.lab=0.8, xaxt='n')
   axis(1, cex.axis=0.6, mgp=c(2.5,0.5,0))
   title(xlab='Estimated Pr of Collision (log-transformed)', mgp=c(1.8,0.5,0), cex.lab=0.8)
 dev.off()
 
-png('figs/brq_egk.png', pointsize = 9, res=300, width = 900, height = 900, bg='transparent')
+png('figs/brq_egk.png', pointsize = 12, res=300, width = 900, height = 900, bg='transparent')
   par(mar=c(3.0,3.5,1.5,0.5))
   binnedplot(log(data$egk), coll.resid.norm, ylab="RQ Residual", xlab="", main='', cex.axis=0.6, las=1, mgp=c(2.5,1,0), cex.lab=0.8, xaxt='n')
   axis(1, cex.axis=0.6, mgp=c(2.5,0.5,0))
   title(xlab='Kangaroo Occurrence (log-transformed)', mgp=c(1.8,0.5,0), cex.lab=0.8)
 dev.off()
 
-png('figs/brq_trains.png', pointsize = 9, res=300, width = 900, height = 900, bg='transparent')
+png('figs/brq_trains.png', pointsize = 12, res=300, width = 900, height = 900, bg='transparent')
   par(mar=c(3.0,3.5,1.5,0.5))  
   binnedplot(log(data$trains), coll.resid.norm, ylab="RQ Residual", xlab="", main='', cex.axis=0.6, las=1, mgp=c(2.5,1,0), cex.lab=0.8, xaxt='n')
   axis(1, cex.axis=0.6, mgp=c(2.5,0.5,0))
   title(xlab='Number of Trains (log-transformed)', mgp=c(1.8,0.5,0), cex.lab=0.8)
 dev.off()
 
-png('figs/brq_speed.png', pointsize = 9, res=300, width = 900, height = 900, bg='transparent')
+png('figs/brq_speed.png', pointsize = 12, res=300, width = 900, height = 900, bg='transparent')
   par(mar=c(3.0,3.5,1.5,0.5))
   binnedplot(data$speed, coll.resid.norm, ylab="RQ Residual", xlab="", main='', cex.axis=0.6, las=1, mgp=c(2.5,1,0), cex.lab=0.8, xaxt='n')
   axis(1, cex.axis=0.6, mgp=c(2.5,0.5,0))
   title(xlab='Train Speed', mgp=c(1.8,0.5,0), cex.lab=0.8)
 dev.off()
 
-png('figs/brq_hour.png', pointsize = 9, res=300, width = 900, height = 900, bg='transparent')
+png('figs/brq_hour.png', pointsize = 12, res=300, width = 900, height = 900, bg='transparent')
   par(mar=c(3.0,3.5,1.5,0.5))
   binnedplot(data$hour, coll.resid.norm, ylab="RQ Residual", xlab="", main='', cex.axis=0.6, las=1, mgp=c(2.5,1,0), cex.lab=0.8, xaxt='n')
   axis(1, cex.axis=0.6, mgp=c(2.5,0.5,0))
