@@ -3,7 +3,7 @@
 .RData
 .Ruserdata
 coll_model_trains.Rproj
-/data
-/figs
-/output
-/publish
+data/*
+figs/*
+output/*
+publish/*
