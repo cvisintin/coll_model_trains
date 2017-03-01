@@ -90,7 +90,7 @@ ggplot(data) +
                     mean(kilometre)
                 )
   ),
-  size=0.5) +
+  size=0.8) +
   geom_ribbon(aes(x=x,
                   ymin=invcloglog(
                     model.coefs[1] +
@@ -113,7 +113,7 @@ ggplot(data) +
                       mean(kilometre)
                   )
   ),
-  alpha=0.2) +
+  alpha=0.3) +
   ylab("Likelihood of Collision") +
   xlab("Likelihood of Species Occurrence") +
   theme_bw() +
@@ -143,7 +143,7 @@ ggplot(data) +
                     mean(kilometre)
                 )
   ),
-  size=0.5) +
+  size=0.8) +
   geom_ribbon(aes(x=x,
                   ymin=invcloglog(
                     model.coefs[1] +
@@ -166,7 +166,7 @@ ggplot(data) +
                       mean(kilometre)
                   )
   ),
-  alpha=0.2) +
+  alpha=0.3) +
   ylab("Likelihood of Collision") +
   xlab("Number of Trains") +
   theme_bw() +
@@ -196,7 +196,7 @@ ggplot(data) +
                     mean(kilometre)
                 )
   ),
-  size=0.5) +
+  size=0.8) +
   geom_ribbon(aes(x=x,
                   ymin=invcloglog(
                     model.coefs[1] +
@@ -219,7 +219,7 @@ ggplot(data) +
                       mean(kilometre)
                   )
   ),
-  alpha=0.2) +
+  alpha=0.3) +
   ylab("Likelihood of Collision") +
   xlab("Train Speed (km/hr)") +
   theme_bw() +
@@ -248,7 +248,7 @@ ggplot(data) +
                     mean(kilometre)
                 )
   ),
-  size=0.5, col='black') +
+  size=0.8, col='black') +
   geom_ribbon(aes(x=x,
                   ymin=invcloglog(
                     model.coefs[1] +
@@ -271,7 +271,7 @@ ggplot(data) +
                       mean(kilometre)
                   )
   ),
-  alpha=0.2) +
+  alpha=0.3) +
   ylab("Likelihood of Collision") +
   xlab("Hour") +
   theme_bw() +
@@ -795,7 +795,7 @@ ggplot(data) +
                     mean(kilometre)
                 )
   ),
-  size=0.5,colour='#94d1c7') +
+  size=0.8,colour='#94d1c7') +
   geom_ribbon(aes(x=x,
                   ymin=invcloglog(
                     model.coefs[1] +
@@ -818,7 +818,7 @@ ggplot(data) +
                       mean(kilometre)
                   )
   ),
-  alpha=0.2) +
+  alpha=0.3) +
   ylab("RELATIVE COLLISION RATE") +
   xlab("LIKELIHOOD OF SPECIES OCCURRENCE") +
   theme_bw() +
@@ -847,7 +847,7 @@ ggplot(data) +
                     mean(kilometre)
                 )
   ),
-  size=0.5,colour='#94d1c7') +
+  size=0.8,colour='#94d1c7') +
   geom_ribbon(aes(x=x,
                   ymin=invcloglog(
                     model.coefs[1] +
@@ -870,7 +870,7 @@ ggplot(data) +
                       mean(kilometre)
                   )
   ),
-  alpha=0.2) +
+  alpha=0.3) +
   ylab("RELATIVE COLLISION RATE") +
   xlab("TRAIN FREQUENCY (TRAINS/HR)") +
   theme_bw() +
@@ -899,7 +899,7 @@ ggplot(data) +
                     mean(kilometre)
                 )
   ),
-  size=0.5,colour='#94d1c7') +
+  size=0.8,colour='#94d1c7') +
   geom_ribbon(aes(x=x,
                   ymin=invcloglog(
                     model.coefs[1] +
@@ -922,7 +922,7 @@ ggplot(data) +
                       mean(kilometre)
                   )
   ),
-  alpha=0.2) +
+  alpha=0.3) +
   ylab("RELATIVE COLLISION RATE") +
   xlab("TRAIN SPEED (KM/HR)") +
   theme_bw() +
@@ -950,7 +950,7 @@ ggplot(data) +
                       mean(kilometre)
                   )
   ),
-  size=0.5, colour='#94d1c7') +
+  size=0.8, colour='#94d1c7') +
   geom_ribbon(aes(x=x,
                   ymin=invcloglog(
                     model.coefs[1] +
@@ -973,7 +973,7 @@ ggplot(data) +
                       mean(kilometre)
                   )
   ),
-  alpha=0.2) +
+  alpha=0.3) +
   ylab("RELATIVE COLLISION RATE") +
   xlab("HOUR") +
   theme_bw() +
