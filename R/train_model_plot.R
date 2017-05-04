@@ -604,6 +604,7 @@ perform.glm <- rbind(calib_int=calib$coefficients[1], calib_slope=calib$coeffici
 colnames(perform.glm) <- "0.0"
 
 png('figs/calib.png', pointsize = 12, res=300, width = 900, height = 900, bg='transparent')
+#png('figs/calib.png', pointsize = 12, res=300, width = 1400, height = 900, bg='transparent')
 ggplot() +
   #geom_smooth(data=plot.glm, aes(y=y,x=x), formula=y~log(x), method=glm, size = 0.2, colour='black', inherit.aes=FALSE) +
   geom_line(data=yp_bins, aes(y=invcloglog(calib$coefficients[1]+calib$coefficients[2]*log(p)),x=p)) +

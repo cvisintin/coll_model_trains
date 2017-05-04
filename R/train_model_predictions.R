@@ -9,17 +9,6 @@ y <- model.data.bin$coll
 egk <- model.data.bin$egk
 trains <- model.data.bin$trains
 speed <- model.data.bin$speed
-# light <- model.data.bin$light
-# light2 <- model.data.bin$light2
-# dawnordusk <- model.data.bin$dawnordusk
-# kilometre <- model.data.bin$length
-
-# getmode <- function(v) {
-#   uniqv <- unique(v)
-#   uniqv[which.max(tabulate(match(v, uniqv)))]
-# }
-# 
-# getmode(model.data.bin$trains)
 
 spatial <- as.matrix(cbind(x=145,y=-37))
 
