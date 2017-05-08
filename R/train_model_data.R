@@ -30,15 +30,6 @@ month_hist <- hist(coll_db_hm$month, breaks=0:12, xlab= 'Month', xaxt="n", xaxs=
 axis(side=1,at=month_hist$mids,labels=seq(1,12))
 dev.off()
 
-# spatial <- as.matrix(cbind(x=145,y=-37))
-# 
-# for (i in 1:nrow(coll_db_hm)){
-#   coll_db_hm[i,dawn:=(crepuscule(spatial,as.POSIXct(paste0("2012-",month,"-15")),solarDep=6,direction=c("dawn"),POSIXct.out=FALSE)*24)]
-#   coll_db_hm[i,dusk:=(crepuscule(spatial,as.POSIXct(paste0("2012-",month,"-15")),solarDep=6,direction=c("dusk"),POSIXct.out=FALSE)*24)]
-#   coll_db_hm[i,dawndusk:=(crepuscule(spatial,as.POSIXct(paste0("2012-",month,"-15")),solarDep=6,direction=c("dusk"),POSIXct.out=FALSE)*24)-(crepuscule(spatial,as.POSIXct(paste0("2012-",month,"-15")),solarDep=6,direction=c("dawn"),POSIXct.out=FALSE)*24)]
-# }
-# setkey(coll_db_hm,id,hour,dawndusk)
-
 
 for (i in 1:nrow(coll_db_hm)){
   coords <- coll_db_hm[i,.(x,y)]
@@ -181,56 +172,55 @@ model.data.hm$light2 <- model.data.hm$light ^ 2
 
 model.data.hm$dawnordusk <- dawn.or.dusk(h=model.data.hm$hour,dawn=model.data.hm$dawn,dusk=model.data.hm$dusk)
 
-
 write.csv(model.data.hm, file = "data/model_data_hm.csv", row.names=FALSE)
 
 
-################Hexagonal Grid#####################
-coll_db_hm <- as.data.table(dbGetQuery(con,"
-  SELECT
-    pts.id AS pid, grid.id AS id, pts.hour AS hour, pts.day AS day, pts.month AS month, pts.year as year, pts.x AS x, pts.y AS y
-  FROM
-    vline.vic_gda9455_fauna_egkcoll_train_onnetwork AS pts, gis_victoria.vic_gda9455_admin_state_1km2hexgrid AS grid
-  WHERE
-    ST_contains(grid.geom, pts.geom)
-  "))
-
-coll_db_bgh <- as.data.table(dbGetQuery(con,"
-  SELECT
-    y.id AS id, y.egk AS egk, AVG(y.trains) AS trains, AVG(y.length) AS length, AVG(y.speed) AS speed, y.hour AS hour, CAST(0 AS integer) AS coll
-  FROM
-    (SELECT
-      x.id AS id, x.egk AS egk, COUNT(x.trains) AS trains, AVG(x.length) AS length, AVG(x.speed) AS speed, x.hour AS hour
-    FROM
-      (SELECT 
-        grid.id AS id, grid.egk AS egk, seg.dow as dow, COUNT(seg.train) AS trains, ST_Length(ST_LineMerge(ST_Union(ST_Intersection(grid.geom, seg.geom))))/1000 AS length, AVG(seg.speed) AS speed, seg.hour AS hour
-      FROM
-        vline.vic_gda9455_rail_vline_speeds AS seg, 
-        (SELECT 
-          g.id as id,
-          ST_Value(p.rast,ST_Centroid(g.geom)) AS egk,
-          g.geom as geom
-        FROM 
-          gis_victoria.vic_gda9455_grid_egk_preds_brt AS p,
-          gis_victoria.vic_gda9455_admin_state_1km2hexgrid AS g
-        WHERE
-          ST_Intersects(p.rast,ST_Centroid(g.geom))) AS grid
-      WHERE
-        ST_Intersects(grid.geom, seg.geom)
-      AND
-        grid.egk NOTNULL
-      AND
-        seg.speed <> 'Infinity'
-      AND
-        seg.speed <= 160
-      GROUP BY
-        grid.id, grid.egk, seg.train, seg.hour, seg.dow
-      ) as x
-    GROUP BY
-      x.id, x.egk, x.hour, x.dow) as y
-  GROUP BY
-    y.id, y.egk, y.hour
-    "))
-setkey(coll_db_bgh,id,hour)
-
-write.csv(model.data.hm, file = "data/model_data_hm_hex.csv", row.names=FALSE)
+################ Experimental Hexagonal Grid #####################
+# coll_db_hm <- as.data.table(dbGetQuery(con,"
+#   SELECT
+#     pts.id AS pid, grid.id AS id, pts.hour AS hour, pts.day AS day, pts.month AS month, pts.year as year, pts.x AS x, pts.y AS y
+#   FROM
+#     vline.vic_gda9455_fauna_egkcoll_train_onnetwork AS pts, gis_victoria.vic_gda9455_admin_state_1km2hexgrid AS grid
+#   WHERE
+#     ST_contains(grid.geom, pts.geom)
+#   "))
+# 
+# coll_db_bgh <- as.data.table(dbGetQuery(con,"
+#   SELECT
+#     y.id AS id, y.egk AS egk, AVG(y.trains) AS trains, AVG(y.length) AS length, AVG(y.speed) AS speed, y.hour AS hour, CAST(0 AS integer) AS coll
+#   FROM
+#     (SELECT
+#       x.id AS id, x.egk AS egk, COUNT(x.trains) AS trains, AVG(x.length) AS length, AVG(x.speed) AS speed, x.hour AS hour
+#     FROM
+#       (SELECT 
+#         grid.id AS id, grid.egk AS egk, seg.dow as dow, COUNT(seg.train) AS trains, ST_Length(ST_LineMerge(ST_Union(ST_Intersection(grid.geom, seg.geom))))/1000 AS length, AVG(seg.speed) AS speed, seg.hour AS hour
+#       FROM
+#         vline.vic_gda9455_rail_vline_speeds AS seg, 
+#         (SELECT 
+#           g.id as id,
+#           ST_Value(p.rast,ST_Centroid(g.geom)) AS egk,
+#           g.geom as geom
+#         FROM 
+#           gis_victoria.vic_gda9455_grid_egk_preds_brt AS p,
+#           gis_victoria.vic_gda9455_admin_state_1km2hexgrid AS g
+#         WHERE
+#           ST_Intersects(p.rast,ST_Centroid(g.geom))) AS grid
+#       WHERE
+#         ST_Intersects(grid.geom, seg.geom)
+#       AND
+#         grid.egk NOTNULL
+#       AND
+#         seg.speed <> 'Infinity'
+#       AND
+#         seg.speed <= 160
+#       GROUP BY
+#         grid.id, grid.egk, seg.train, seg.hour, seg.dow
+#       ) as x
+#     GROUP BY
+#       x.id, x.egk, x.hour, x.dow) as y
+#   GROUP BY
+#     y.id, y.egk, y.hour
+#     "))
+# setkey(coll_db_bgh,id,hour)
+# 
+# write.csv(model.data.hm, file = "data/model_data_hm_hex.csv", row.names=FALSE)

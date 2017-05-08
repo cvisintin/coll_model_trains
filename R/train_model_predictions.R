@@ -2,7 +2,9 @@ require(data.table)
 require(maptools)
 require(doMC)
 require(RPostgreSQL)
-require(rstan)
+
+load(file="output/coll_glm")
+model.data.bin <- as.data.table(read.delim("data/model_data_hm_bin.csv", header=T, sep=","))
 
 n <- nrow(model.data.bin)
 y <- model.data.bin$coll
@@ -12,8 +14,8 @@ speed <- model.data.bin$speed
 
 spatial <- as.matrix(cbind(x=145,y=-37))
 
-model.coefs <- get_posterior_mean(coll.stan.bin2, pars="b")
-model.coefs.ci <- summary(coll.stan.bin2, pars = c("b"), probs = c(0.025, 0.975))$summary[, c("2.5%", "97.5%")]
+model.coefs <- coef(coll.glm)
+model.coefs.ci <- confint(coll.glm)
 
 pred.values <- expand.grid(h=c(6,12,18),m=c(1,4,7))
 
