@@ -45,13 +45,15 @@ data <- data.frame("y"=model.data.bin$coll,
                    "egk_lc"=log(model.data.bin$egk)-mean(log(model.data.bin$egk)),
                    "trains_lc"=log(model.data.bin$trains)-mean(log(model.data.bin$trains)),
                    "speed_lc"=log(model.data.bin$speed)-mean(log(model.data.bin$speed)),
-                   "light"=model.data.bin$light-mean(model.data.bin$light),
-                   "light2"=model.data.bin$light2-mean(model.data.bin$light2),
-                   "dawnordusk"=model.data.bin$dawnordusk-mean(model.data.bin$dawnordusk),
+                   "light"=model.data.bin$light,
+                   "light2"=model.data.bin$light2,
+                   "dawnordusk"=model.data.bin$dawnordusk,
                    "kilometre"=log(model.data.bin$length)
                     )
 
 data <- cbind(data,model.data.bin[,c(6,10:11),with=FALSE])
+
+cor(data[,5:10])
 
 save(data, file="data/coll_glm_data")
 write.csv(data, file="data/coll_glm_data.csv", row.names=F)
@@ -87,54 +89,9 @@ lrtest(coll.glm.wo_trains, coll.glm.wo_speed)
 lrtest(coll.glm.wo_trains, coll.glm.wo_temp)
 lrtest(coll.glm.wo_trains, coll.glm.w_trains)
 
-# Likelihood ratio test
-# 
-# Model 1: y ~ egk_lc + speed_lc + light + light2 + dawnordusk
-# Model 2: y ~ speed_lc + light + light2 + dawnordusk
-# Model 3: y ~ egk_lc + light + light2 + dawnordusk
-# Model 4: y ~ egk_lc + speed_lc
-# Model 5: y ~ egk_lc + trains_lc + speed_lc + light + light2 + dawnordusk
-# #Df  LogLik Df   Chisq Pr(>Chisq)    
-# 1   6 -2757.8                          
-# 2   5 -2816.9 -1 118.077  < 2.2e-16 ***
-# 3   5 -2837.4  0  41.026  < 2.2e-16 ***
-# 4   3 -2866.9 -2  58.958  1.575e-13 ***
-# 5   7 -2757.8  4 218.089  < 2.2e-16 ***
-#   ---
-#   Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
 
-save(coll.glm.w_trains, file="output/coll_glm")
+save(coll.glm.wo_trains, coll.glm.wo_egk, coll.glm.wo_speed, coll.glm.wo_temp, coll.glm.w_trains, file="output/coll_glm")
 
-# Confindence Intervals - Monte Carlo Simulation
-
-# fit.sim <- function(mod.input) {
-#   b0 <- coef(coll.glm.full)[1]
-#   b1 <- coef(coll.glm.full)[2]
-#   b2 <- coef(coll.glm.full)[3]
-#   b3 <- coef(coll.glm.full)[4]
-#   b4 <- coef(coll.glm.full)[5]
-#   b5 <- coef(coll.glm.full)[6]
-#   b6 <- coef(coll.glm.full)[7]
-#   
-#   p <- 1 - exp(-exp(b0 + as.matrix(data[,c("egk_lc","trains_lc","speed_lc",'light',"light2","dawnordusk")]) %*% c(b1,b2,b3,b4,b5,b6) + data$kilometre))
-#   
-#   y.sim <- rbinom(length(p), 1, p)
-#   
-#   glm.sim <- stats::glm(formula=y.sim ~ egk_lc + trains_lc + speed_lc + light + light2 + dawnordusk,
-#                         offset=kilometre,
-#                         family=stats::binomial(link="cloglog"),
-#                         data=data)
-#   
-#   coef(glm.sim)
-# }
-# 
-# N <- 50
-# 
-# simulated.coef <- replicate(N, fit.sim())
-# 
-# simulated.coef <- t(simulated.coef)
-# 
-# quant.coefs <- apply(simulated.coef, 2, quantile, c(0.025, 0.975))
 
 ci.sim <- function(model, x.range, ind.var){
   conf.df <- data.frame("egk_lc"=rep(mean(data$egk_lc),length(x.range)),"trains_lc"=mean(data$trains_lc),"speed_lc"=mean(data$speed_lc),"light"=mean(data$light),"light2"=mean(data$light2),"dawnordusk"=mean(data$dawnordusk),"kilometre"=mean(data$kilometre))
@@ -241,35 +198,35 @@ coll.resid.norm <- qnorm(coll.resid)
 
 png('figs/brq_prob.png', pointsize = 12, res=300, width = 1200, height = 900, bg='transparent')
   par(mar=c(3.0,3.5,1.5,0.5))
-  binnedplot(log(predict(coll.glm.w_trains, type = 'response')), coll.resid.norm, ylab="RQ Residual", xlab="", main='', cex.axis=0.6, las=1, mgp=c(2.5,1,0), cex.lab=0.8, xaxt='n')
+  binnedplot(log(predict(coll.glm.w_trains, type = 'response')), coll.resid.norm, ylab="RQ Residual", xlab="", main='', cex.axis=0.6, las=1, mgp=c(2.5,1,0), cex.lab=0.8, xaxt='n', cex.pts=0.4)
   axis(1, cex.axis=0.6, mgp=c(2.5,0.5,0))
   title(xlab='Estimated Pr of Collision (log-transformed)', mgp=c(1.8,0.5,0), cex.lab=0.8)
 dev.off()
 
 png('figs/brq_egk.png', pointsize = 12, res=300, width = 900, height = 900, bg='transparent')
   par(mar=c(3.0,3.5,1.5,0.5))
-  binnedplot(log(data$egk), coll.resid.norm, ylab="RQ Residual", xlab="", main='', cex.axis=0.6, las=1, mgp=c(2.5,1,0), cex.lab=0.8, xaxt='n')
+  binnedplot(log(data$egk), coll.resid.norm, ylab="RQ Residual", xlab="", main='', cex.axis=0.6, las=1, mgp=c(2.5,1,0), cex.lab=0.8, xaxt='n', cex.pts=0.4)
   axis(1, cex.axis=0.6, mgp=c(2.5,0.5,0))
   title(xlab='Kangaroo Occurrence (log-transformed)', mgp=c(1.8,0.5,0), cex.lab=0.8)
 dev.off()
 
 png('figs/brq_trains.png', pointsize = 12, res=300, width = 900, height = 900, bg='transparent')
   par(mar=c(3.0,3.5,1.5,0.5))  
-  binnedplot(log(data$trains), coll.resid.norm, ylab="RQ Residual", xlab="", main='', cex.axis=0.6, las=1, mgp=c(2.5,1,0), cex.lab=0.8, xaxt='n')
+  binnedplot(log(data$trains), coll.resid.norm, ylab="RQ Residual", xlab="", main='', cex.axis=0.6, las=1, mgp=c(2.5,1,0), cex.lab=0.8, xaxt='n', cex.pts=0.4)
   axis(1, cex.axis=0.6, mgp=c(2.5,0.5,0))
   title(xlab='Number of Trains (log-transformed)', mgp=c(1.8,0.5,0), cex.lab=0.8)
 dev.off()
 
 png('figs/brq_speed.png', pointsize = 12, res=300, width = 900, height = 900, bg='transparent')
   par(mar=c(3.0,3.5,1.5,0.5))
-  binnedplot(data$speed, coll.resid.norm, ylab="RQ Residual", xlab="", main='', cex.axis=0.6, las=1, mgp=c(2.5,1,0), cex.lab=0.8, xaxt='n')
+  binnedplot(data$speed, coll.resid.norm, ylab="RQ Residual", xlab="", main='', cex.axis=0.6, las=1, mgp=c(2.5,1,0), cex.lab=0.8, xaxt='n', cex.pts=0.4)
   axis(1, cex.axis=0.6, mgp=c(2.5,0.5,0))
   title(xlab='Train Speed', mgp=c(1.8,0.5,0), cex.lab=0.8)
 dev.off()
 
 png('figs/brq_hour.png', pointsize = 12, res=300, width = 900, height = 900, bg='transparent')
   par(mar=c(3.0,3.5,1.5,0.5))
-  binnedplot(data$hour, coll.resid.norm, ylab="RQ Residual", xlab="", main='', cex.axis=0.6, las=1, mgp=c(2.5,1,0), cex.lab=0.8, xaxt='n')
+  binnedplot(data$hour, coll.resid.norm, ylab="RQ Residual", xlab="", main='', cex.axis=0.6, las=1, mgp=c(2.5,1,0), cex.lab=0.8, xaxt='n', cex.pts=0.4)
   axis(1, cex.axis=0.6, mgp=c(2.5,0.5,0))
   title(xlab='Hour', mgp=c(1.8,0.5,0), cex.lab=0.8)
 dev.off()

@@ -166,11 +166,10 @@ cv_plot_data <- foreach(i = 1:length(model.list), .combine=rbind) %do% {
                     levels=rev(c("Intercept","Slope","ROC"))
                     )
   
-  cv_plot <- transform(data.frame(id = as.character(names(model.list)[i]), x = metrics, y = perform.glm.1000[, 2], y_orig = perform.glm.1000[, 1]),
+  transform(data.frame(id = as.character(names(model.list)[i]), x = metrics, y = perform.glm.1000[, 2], y_orig = perform.glm.1000[, 1]),
                        ylo=perform.glm.1000[, 2] - 2*perform.glm.1000[, 3],
                        yhi=perform.glm.1000[, 2] + 2*perform.glm.1000[, 3]
                        )
-  cv_plot
 }
 
 # y <- coll.glm$data$y
@@ -233,27 +232,87 @@ cv_plot_data <- foreach(i = 1:length(model.list), .combine=rbind) %do% {
 #                           "cv_model_rhi"=signif(apply(perform.glm.cv,1,range), digits=4)[2,]
 # )
 
-png('figs/validate_colour.png', pointsize = 10, res=300, width = 900, height = 900, bg='transparent')
-p <- ggplot() +
-  geom_pointrange(data=cv_plot_data, aes(x=x, y=y, ymin=ylo, ymax=yhi, colour = factor(id, rev(c("wo_trains","wo_egk","wo_speed","wo_temp","all")))), size = 0.5, fatten=1, position = position_dodge(width=0.75)) +
+png('figs/validate_colour_01.png', pointsize = 10, res=300, width = 400, height = 1000, bg='transparent')
+p <- ggplot(data=cv_plot_data[grep("calib_int",row.names(cv_plot_data)), ]) +
+  geom_pointrange(aes(x=x, y=y, ymin=ylo, ymax=yhi, colour = factor(id, rev(c("wo_trains","wo_egk","wo_speed","wo_temp","all")))), size = 0.5, fatten=1, position = position_dodge(width=0.75)) +
   coord_flip() +
-  ylab("Value") +
-  xlab("Test Metric") +
+  ylab("Intercept") +
+  xlab("") +
   labs(colour="Model") +
-  geom_text(data=cv_plot_data, aes(x=x, y=y, label=round(y,3), colour = factor(id, rev(c("wo_trains","wo_egk","wo_speed","wo_temp","all")))), hjust=1.3, vjust=1.3, size=2, inherit.aes=FALSE, position = position_dodge(width=0.75)) +
+  geom_text(aes(x=x, y=y, label=round(y,3), colour = factor(id, rev(c("wo_trains","wo_egk","wo_speed","wo_temp","all")))), hjust=1.3, vjust=1.3, size=2, inherit.aes=FALSE, position = position_dodge(width=0.75)) +
   guides(colour = guide_legend(reverse = TRUE, override.aes = list(size=0.2))) +
   theme_bw() +
   scale_color_manual(values=c("#7eb79d", "#a09cbc", "#fb8072", "#80b1d3", "#db9546", "#969696")) +
+  theme(legend.position="none",axis.title.y=element_blank(),axis.text.y=element_blank(),axis.ticks.y=element_blank()) +
+  theme(plot.margin=unit(c(.5,.5,.1,.1),"cm")) +
+  theme(axis.title.x = element_text(margin=unit(c(.3,0,0,0),"cm"))) +
+  theme(axis.title.y = element_text(margin=unit(c(0,.3,0,0),"cm"))) +
+  theme(panel.grid.major = element_line(size=0.1), panel.grid.minor = element_line(size=0.1)) +
+  theme(text = element_text(size = 8))
+p + geom_point(data=cv_plot_data[grep("calib_int",row.names(cv_plot_data)), ], aes(x=x, y=y_orig, colour = factor(id, rev(c("wo_trains","wo_egk","wo_speed","wo_temp","all")))), size = 2.5, shape=1, inherit.aes=FALSE, position = position_dodge(width=0.75))
+dev.off()
+
+png('figs/validate_colour_02.png', pointsize = 10, res=300, width = 400, height = 1000, bg='transparent')
+p <- ggplot(data=cv_plot_data[grep("calib_slope",row.names(cv_plot_data)), ]) +
+  geom_pointrange(aes(x=x, y=y, ymin=ylo, ymax=yhi, colour = factor(id, rev(c("wo_trains","wo_egk","wo_speed","wo_temp","all")))), size = 0.5, fatten=1, position = position_dodge(width=0.75)) +
+  coord_flip() +
+  ylab("Slope") +
+  xlab("") +
+  labs(colour="Model") +
+  geom_text(aes(x=x, y=y, label=round(y,3), colour = factor(id, rev(c("wo_trains","wo_egk","wo_speed","wo_temp","all")))), hjust=1.3, vjust=1.3, size=2, inherit.aes=FALSE, position = position_dodge(width=0.75)) +
+  guides(colour = guide_legend(reverse = TRUE, override.aes = list(size=0.2))) +
+  theme_bw() +
+  scale_color_manual(values=c("#7eb79d", "#a09cbc", "#fb8072", "#80b1d3", "#db9546", "#969696")) +
+  theme(legend.position="none",axis.title.y=element_blank(),axis.text.y=element_blank(),axis.ticks.y=element_blank()) +
+  theme(plot.margin=unit(c(.5,.5,.1,.1),"cm")) +
+  theme(axis.title.x = element_text(margin=unit(c(.3,0,0,0),"cm"))) +
+  theme(axis.title.y = element_text(margin=unit(c(0,.3,0,0),"cm"))) +
+  theme(panel.grid.major = element_line(size=0.1), panel.grid.minor = element_line(size=0.1)) +
+  theme(text = element_text(size = 8))
+p + geom_point(data=cv_plot_data[grep("calib_slope",row.names(cv_plot_data)), ], aes(x=x, y=y_orig, colour = factor(id, rev(c("wo_trains","wo_egk","wo_speed","wo_temp","all")))), size = 2.5, shape=1, inherit.aes=FALSE, position = position_dodge(width=0.75))
+dev.off()
+
+png('figs/validate_colour_03.png', pointsize = 10, res=300, width = 700, height = 1000, bg='transparent')
+p <- ggplot(data=cv_plot_data[grep("roc",row.names(cv_plot_data)), ]) +
+  geom_pointrange(aes(x=x, y=y, ymin=ylo, ymax=yhi, colour = factor(id, rev(c("wo_trains","wo_egk","wo_speed","wo_temp","all")))), size = 0.5, fatten=1, position = position_dodge(width=0.75)) +
+  coord_flip() +
+  ylab("ROC") +
+  xlab("") +
+  labs(colour="Model") +
+  geom_text(aes(x=x, y=y, label=round(y,3), colour = factor(id, rev(c("wo_trains","wo_egk","wo_speed","wo_temp","all")))), hjust=1.3, vjust=1.3, size=2, inherit.aes=FALSE, position = position_dodge(width=0.75)) +
+  guides(colour = guide_legend(reverse = TRUE, override.aes = list(size=0.2))) +
+  theme_bw() +
+  scale_color_manual(values=c("#7eb79d", "#a09cbc", "#fb8072", "#80b1d3", "#db9546", "#969696")) +
+  theme(axis.title.y=element_blank(),axis.text.y=element_blank(),axis.ticks.y=element_blank()) +
   theme(plot.margin=unit(c(.5,0,.1,.1),"cm")) +
   theme(axis.title.x = element_text(margin=unit(c(.3,0,0,0),"cm"))) +
   theme(axis.title.y = element_text(margin=unit(c(0,.3,0,0),"cm"))) +
   theme(panel.grid.major = element_line(size=0.1), panel.grid.minor = element_line(size=0.1)) +
-  theme(text = element_text(size = 8)) +
-  scale_y_continuous(expand = c(0,0)) +
-  scale_x_discrete(expand = c(0,0))
-p + geom_point(data=cv_plot_data, aes(x=x, y=y_orig, colour = factor(id, rev(c("wo_trains","wo_egk","wo_speed","wo_temp","all")))), size = 2.5, shape=1, inherit.aes=FALSE, position = position_dodge(width=0.75)) +
-  geom_segment(aes(x = 2.5, y = 0, xend = 3.5, yend = 0), linetype=2, size=0.1) +
-  geom_segment(aes(x = 0.5, y = 1, xend = 2.5, yend = 1), linetype=2, size=0.1) +
-  geom_segment(aes(x = 2.5, y = -2.5, xend = 2.5, yend = 2.5), linetype=1, size=0.1) +
-  geom_segment(aes(x = 1.5, y = -2.5, xend = 1.5, yend = 2.5), linetype=1, size=0.1)
+  theme(text = element_text(size = 8))
+p + geom_point(data=cv_plot_data[grep("roc",row.names(cv_plot_data)), ], aes(x=x, y=y_orig, colour = factor(id, rev(c("wo_trains","wo_egk","wo_speed","wo_temp","all")))), size = 2.5, shape=1, inherit.aes=FALSE, position = position_dodge(width=0.75))
 dev.off()
+
+# png('figs/validate_colour.png', pointsize = 10, res=300, width = 900, height = 900, bg='transparent')
+# p <- ggplot() +
+#   geom_pointrange(data=cv_plot_data, aes(x=x, y=y, ymin=ylo, ymax=yhi, colour = factor(id, rev(c("wo_trains","wo_egk","wo_speed","wo_temp","all")))), size = 0.5, fatten=1, position = position_dodge(width=0.75)) +
+#   coord_flip() +
+#   ylab("Value") +
+#   xlab("Test Metric") +
+#   labs(colour="Model") +
+#   geom_text(data=cv_plot_data, aes(x=x, y=y, label=round(y,3), colour = factor(id, rev(c("wo_trains","wo_egk","wo_speed","wo_temp","all")))), hjust=1.3, vjust=1.3, size=2, inherit.aes=FALSE, position = position_dodge(width=0.75)) +
+#   guides(colour = guide_legend(reverse = TRUE, override.aes = list(size=0.2))) +
+#   theme_bw() +
+#   scale_color_manual(values=c("#7eb79d", "#a09cbc", "#fb8072", "#80b1d3", "#db9546", "#969696")) +
+#   theme(plot.margin=unit(c(.5,0,.1,.1),"cm")) +
+#   theme(axis.title.x = element_text(margin=unit(c(.3,0,0,0),"cm"))) +
+#   theme(axis.title.y = element_text(margin=unit(c(0,.3,0,0),"cm"))) +
+#   theme(panel.grid.major = element_line(size=0.1), panel.grid.minor = element_line(size=0.1)) +
+#   theme(text = element_text(size = 8)) +
+#   scale_y_continuous(expand = c(0,0)) +
+#   scale_x_discrete(expand = c(0,0))
+# p + geom_point(data=cv_plot_data, aes(x=x, y=y_orig, colour = factor(id, rev(c("wo_trains","wo_egk","wo_speed","wo_temp","all")))), size = 2.5, shape=1, inherit.aes=FALSE, position = position_dodge(width=0.75)) +
+#   geom_segment(aes(x = 2.5, y = 0, xend = 3.5, yend = 0), linetype=2, size=0.1) +
+#   geom_segment(aes(x = 0.5, y = 1, xend = 2.5, yend = 1), linetype=2, size=0.1) +
+#   geom_segment(aes(x = 2.5, y = -2.5, xend = 2.5, yend = 2.5), linetype=1, size=0.1) +
+#   geom_segment(aes(x = 1.5, y = -2.5, xend = 1.5, yend = 2.5), linetype=1, size=0.1)
+# dev.off()
