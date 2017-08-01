@@ -70,56 +70,114 @@ range(network.xy$dusk)
 
 #####################################################################################################
 
+# registerDoMC(detectCores() - 1)
+# coll_db_bgh <- foreach (i = c(0,70000,140000,210000,280000,350000,420000), .combine=rbind) %dopar% {
+#   drv <- dbDriver("PostgreSQL")  #Specify a driver for postgreSQL type database
+#   con <- dbConnect(drv, dbname="qaeco_spatial", user="qaeco", password="Qpostgres15", host="boab.qaeco.com", port="5432")  #Connection to database server on Boab
+#   as.data.table(dbGetQuery(con,paste0("
+#   SELECT
+#     grid3.id AS id, grid3.egk AS egk, AVG(grid3.trains) AS trains, AVG(grid3.length) AS length, AVG(grid3.speed) AS speed, grid3.hour AS hour, CAST(0 AS integer) AS coll, grid3.x AS x, grid3.y AS y
+#   FROM
+#     (SELECT
+#       grid2.id AS id, grid2.egk AS egk, COUNT(grid2.trains) AS trains, AVG(grid2.length) AS length, AVG(grid2.speed) AS speed, grid2.hour AS hour, grid2.x AS x, grid2.y AS y
+#     FROM
+#       (SELECT
+#           grid.id AS id, grid.egk AS egk, seg.dow as dow, COUNT(seg.train) AS trains, ST_Length(ST_LineMerge(ST_Union(ST_Intersection(grid.geom, seg.geom))))/1000 AS length, AVG(seg.speed) AS speed, seg.hour AS hour, grid.x AS X, grid.y AS Y
+#         FROM
+#           vline.vic_gda9455_rail_vline_speeds AS seg,
+#           (SELECT
+#             g.id as id,
+#             ST_Value(p.rast,ST_Centroid(g.geom)) AS egk,
+#             ST_X(ST_Centroid(g.geom)) AS x,
+#             ST_Y(ST_Centroid(g.geom)) AS y,
+#             g.geom as geom
+#           FROM
+#             gis_victoria.vic_gda9455_grid_egk_preds_brt AS p,
+#             gis_victoria.vic_gda9455_admin_state_1kmgrid AS g
+#           WHERE
+#             (g.id >= ",i," AND g.id < ",i+70000,")
+#           AND
+#             p.rast && g.geom
+#           AND
+#             ST_Intersects(p.rast,ST_Centroid(g.geom))
+#           ORDER BY g.id
+#           LIMIT 70000) AS grid
+#         WHERE
+#           ST_Intersects(grid.geom, seg.geom)
+#         AND
+#           grid.egk NOTNULL
+#         AND
+#           seg.speed <> 'Infinity'
+#         AND
+#           seg.speed <= 160
+#         AND
+#           seg.ogc_fid NOT IN ('455770', '455788', '455806', '477632', '477765', '784862', '784880', '784898', '806602','806735',
+#                               '1103153', '1103171', '1103189', '1124893', '1125026', '1504072', '1504090', '1504108', '1534625',
+#                               '1534758', '1980999', '1981017', '1981035', '2014506','2014639')
+#         GROUP BY
+#           grid.id, grid.egk, seg.train, seg.hour, seg.dow, grid.x, grid.y
+#         ) as grid2
+#     GROUP BY
+#       grid2.id, grid2.egk, grid2.hour, grid2.dow, grid2.x, grid2.y) as grid3
+#    GROUP BY
+#     grid3.id, grid3.egk, grid3.hour, grid3.x, grid3.y
+#     ")))
+# }
+# setkey(coll_db_bgh,id,hour)
+
+###################################
+
 registerDoMC(detectCores() - 1)
 coll_db_bgh <- foreach (i = c(0,70000,140000,210000,280000,350000,420000), .combine=rbind) %dopar% {
   drv <- dbDriver("PostgreSQL")  #Specify a driver for postgreSQL type database
   con <- dbConnect(drv, dbname="qaeco_spatial", user="qaeco", password="Qpostgres15", host="boab.qaeco.com", port="5432")  #Connection to database server on Boab
   as.data.table(dbGetQuery(con,paste0("
-  SELECT
-    grid3.id AS id, grid3.egk AS egk, AVG(grid3.trains) AS trains, AVG(grid3.length) AS length, AVG(grid3.speed) AS speed, grid3.hour AS hour, CAST(0 AS integer) AS coll, grid3.x AS x, grid3.y AS y
-  FROM
-    (SELECT
-      grid2.id AS id, grid2.egk AS egk, COUNT(grid2.trains) AS trains, AVG(grid2.length) AS length, AVG(grid2.speed) AS speed, grid2.hour AS hour, grid2.x AS x, grid2.y AS y
-    FROM
-      (SELECT 
-          grid.id AS id, grid.egk AS egk, seg.dow as dow, COUNT(seg.train) AS trains, ST_Length(ST_LineMerge(ST_Union(ST_Intersection(grid.geom, seg.geom))))/1000 AS length, AVG(seg.speed) AS speed, seg.hour AS hour, grid.x AS X, grid.y AS Y
-        FROM
-          vline.vic_gda9455_rail_vline_speeds AS seg, 
-          (SELECT 
-            g.id as id,
-            ST_Value(p.rast,ST_Centroid(g.geom)) AS egk,
-            ST_X(ST_Centroid(g.geom)) AS x,
-            ST_Y(ST_Centroid(g.geom)) AS y,
-            g.geom as geom
-          FROM 
-            gis_victoria.vic_gda9455_grid_egk_preds_brt AS p,
-            gis_victoria.vic_gda9455_admin_state_1kmgrid AS g
-          WHERE
-            (g.id >= ",i," AND g.id < ",i+70000,")
-          AND
-            p.rast && g.geom
-          AND
-            ST_Intersects(p.rast,ST_Centroid(g.geom))
-          ORDER BY g.id
-          LIMIT 70000) AS grid
-        WHERE
-          ST_Intersects(grid.geom, seg.geom)
-        AND
-          grid.egk NOTNULL
-        AND
-          seg.speed <> 'Infinity'
-        AND
-          seg.speed <= 160
-        GROUP BY
-          grid.id, grid.egk, seg.train, seg.hour, seg.dow, grid.x, grid.y
-        ) as grid2
-    GROUP BY
-      grid2.id, grid2.egk, grid2.hour, grid2.dow, grid2.x, grid2.y) as grid3
-   GROUP BY
-    grid3.id, grid3.egk, grid3.hour, grid3.x, grid3.y
-    ")))
+                                      SELECT
+                                      grid2.id AS id, grid2.egk AS egk, AVG(grid2.trains) AS trains, AVG(grid2.length) AS length, AVG(grid2.speed) AS speed, grid2.hour AS hour, CAST(0 AS integer) AS coll, grid2.x AS x, grid2.y AS y
+                                      FROM
+                                      (SELECT
+                                      grid.id AS id, grid.egk AS egk, seg.dow as dow, COUNT(seg.train) AS trains, ST_Length(ST_LineMerge(ST_Union(ST_Intersection(grid.geom, seg.geom))))/1000 AS length, AVG(seg.speed) AS speed, seg.hour AS hour, grid.x AS X, grid.y AS Y
+                                      FROM
+                                      vline.vic_gda9455_rail_vline_speeds AS seg,
+                                      (SELECT
+                                      g.id as id,
+                                      ST_Value(p.rast,ST_Centroid(g.geom)) AS egk,
+                                      ST_X(ST_Centroid(g.geom)) AS x,
+                                      ST_Y(ST_Centroid(g.geom)) AS y,
+                                      g.geom as geom
+                                      FROM
+                                      gis_victoria.vic_gda9455_grid_egk_preds_brt AS p,
+                                      gis_victoria.vic_gda9455_admin_state_1kmgrid AS g
+                                      WHERE
+                                      (g.id >= ",i," AND g.id < ",i+70000,")
+                                      AND
+                                      p.rast && g.geom
+                                      AND
+                                      ST_Intersects(p.rast,ST_Centroid(g.geom))
+                                      ORDER BY g.id
+                                      LIMIT 70000) AS grid
+                                      WHERE
+                                      ST_Intersects(grid.geom, seg.geom)
+                                      AND
+                                      grid.egk NOTNULL
+                                      AND
+                                      seg.speed <> 'Infinity'
+                                      AND
+                                      seg.speed <= 160
+                                      AND
+                                      seg.ogc_fid NOT IN ('455770', '455788', '455806', '477632', '477765', '784862', '784880', '784898', '806602','806735',
+                                      '1103153', '1103171', '1103189', '1124893', '1125026', '1504072', '1504090', '1504108', '1534625',
+                                      '1534758', '1980999', '1981017', '1981035', '2014506','2014639')
+                                      GROUP BY
+                                      grid.id, grid.egk, seg.train, seg.hour, seg.dow, grid.x, grid.y
+                                      ) as grid2
+                                      GROUP BY
+                                      grid2.id, grid2.egk, grid2.hour, grid2.x, grid2.y
+                                      ")))
 }
 setkey(coll_db_bgh,id,hour)
+
+###################################
 
 #write.csv(coll_db_bgh,"data/coll_db_bgh", row.names=FALSE)
 #coll_db_bgh <- as.data.table(read.csv("data/coll_db_bgh"))
@@ -139,7 +197,7 @@ coll_db_bghm <- foreach (i = 1:12, .combine=rbind) %dopar% {
 setkey(coll_db_bghm,id,hour,dawndusk)
 
 model.data.hm <- copy(coll_db_bghm)
-c <- coll_db_hm[model.data.hm,.N,by=c("id","hour","dawndusk"),nomatch=0]
+c <- coll_db_hm[model.data.hm, .N, by=c("id","hour","dawndusk"), nomatch=0]
 setkey(c,id,hour,dawndusk)
 
 model.data.hm[c, coll := i.N]

@@ -1,9 +1,11 @@
 require(ggplot2)
 require(plyr)
+require(foreach)
 
 # plotPal <- c("#94d1c7")
 
 load(file="output/coll_glm")
+load(file="output/mar_effects_ci")
 load(file="output/perform_glm_cv")
 load(file="data/coll_glm_data")
 
@@ -40,48 +42,10 @@ dawn.or.dusk <- function (h, dawn = 6, dusk = 18, slope = 2) {
                 d(h, dawn + 24, dusk, diff_outer)))
 }
 
-model.coefs <- coef(coll.glm)
-model.coefs.ci <- confint(coll.glm)
-
 png('figs/egk.png', pointsize = 12, res=300, width = 900, height = 900, bg='transparent')
-x <- seq(0,1,1/nrow(data))[-(1:1)]
-ggplot(data) +
-  geom_line(aes(x=x,
-                y=invcloglog(
-                  model.coefs[1] +
-                    model.coefs[2]*(log(x)-mean(log(x))) +
-                    model.coefs[3]*mean(trains_lc) +
-                    model.coefs[4]*mean(speed_lc) +
-                    model.coefs[5]*mean(light) +
-                    model.coefs[6]*mean(light2) +
-                    model.coefs[7]*mean(dawnordusk) +
-                    mean(kilometre)
-                )
-  ),
-  size=0.8) +
-  geom_ribbon(aes(x=x,
-                  ymin=invcloglog(
-                    model.coefs[1] +
-                      model.coefs.ci[2,1]*(log(x)-mean(log(x))) +
-                      model.coefs[3]*mean(trains_lc) +
-                      model.coefs[4]*mean(speed_lc) +
-                      model.coefs[5]*mean(light) +
-                      model.coefs[6]*mean(light2) +
-                      model.coefs[7]*mean(dawnordusk) +
-                      mean(kilometre)
-                  ),
-                  ymax=invcloglog(
-                    model.coefs[1] +
-                      model.coefs.ci[2,2]*(log(x)-mean(log(x))) +
-                      model.coefs[3]*mean(trains_lc) +
-                      model.coefs[4]*mean(speed_lc) +
-                      model.coefs[5]*mean(light) +
-                      model.coefs[6]*mean(light2) +
-                      model.coefs[7]*mean(dawnordusk) +
-                      mean(kilometre)
-                  )
-  ),
-  alpha=0.3) +
+ggplot(egk_mean_ci) +
+  geom_line(aes(x=x, y=y), size=0.8) +
+  geom_ribbon(aes(x=x, ymin=ymin, ymax=ymax), alpha=0.3) +
   ylab("Likelihood of Collision") +
   xlab("Likelihood of Species Occurrence") +
   theme_bw() +
@@ -96,44 +60,9 @@ dev.off()
 
 
 png('figs/trains.png', pointsize = 12, res=300, width = 900, height = 900, bg='transparent')
-x <- seq(0,60,60/nrow(data))[-(1:1)]
-ggplot(data) +
-  geom_line(aes(x=x,
-                y=invcloglog(
-                  model.coefs[1] +
-                    model.coefs[2]*mean(egk_lc) +
-                    model.coefs[3]*(log(x)-mean(log(x))) +
-                    model.coefs[4]*mean(speed_lc) +
-                    model.coefs[5]*mean(light) +
-                    model.coefs[6]*mean(light2) +
-                    model.coefs[7]*mean(dawnordusk) +
-                    mean(kilometre)
-                )
-  ),
-  size=0.8) +
-  geom_ribbon(aes(x=x,
-                  ymin=invcloglog(
-                    model.coefs[1] +
-                      model.coefs[2]*mean(egk_lc) +
-                      model.coefs.ci[3,1]*(log(x)-mean(log(x))) +
-                      model.coefs[4]*mean(speed_lc) +
-                      model.coefs[5]*mean(light) +
-                      model.coefs[6]*mean(light2) +
-                      model.coefs[7]*mean(dawnordusk) +
-                      mean(kilometre)
-                  ),
-                  ymax=invcloglog(
-                    model.coefs[1] +
-                      model.coefs[2]*mean(egk_lc) +
-                      model.coefs.ci[3,2]*(log(x)-mean(log(x))) +
-                      model.coefs[4]*mean(speed_lc) +
-                      model.coefs[5]*mean(light) +
-                      model.coefs[6]*mean(light2) +
-                      model.coefs[7]*mean(dawnordusk) +
-                      mean(kilometre)
-                  )
-  ),
-  alpha=0.3) +
+ggplot(trains_mean_ci) +
+  geom_line(aes(x=x, y=y), size=0.8) +
+  geom_ribbon(aes(x=x, ymin=ymin, ymax=ymax), alpha=0.3) +
   ylab("Likelihood of Collision") +
   xlab("Number of Trains") +
   theme_bw() +
@@ -143,49 +72,14 @@ ggplot(data) +
   theme(axis.title.y = element_text(margin=unit(c(0,.3,0,0),"cm"))) +
   theme(panel.grid.major = element_line(size=0.1),panel.grid.minor = element_line(size=0.1)) +
   theme(text = element_text(size = 10)) +
-  scale_x_continuous(limits = c(0,60), breaks = seq(0,60,10))
+  scale_x_continuous(limits = c(1,20), breaks = seq(1,20,2))
 dev.off()
 
 
 png('figs/speed.png', pointsize = 12, res=300, width = 900, height = 900, bg='transparent')
-x <- seq(10,160,150/nrow(data))[1:nrow(data)]
-ggplot(data) +
-  geom_line(aes(x=x,
-                y=invcloglog(
-                  model.coefs[1] +
-                    model.coefs[2]*mean(egk_lc) +
-                    model.coefs[3]*mean(trains_lc) +
-                    model.coefs[4]*(log(x)-mean(log(x))) +
-                    model.coefs[5]*mean(light) +
-                    model.coefs[6]*mean(light2) +
-                    model.coefs[7]*mean(dawnordusk) +
-                    mean(kilometre)
-                )
-  ),
-  size=0.8) +
-  geom_ribbon(aes(x=x,
-                  ymin=invcloglog(
-                    model.coefs[1] +
-                      model.coefs[2]*mean(egk_lc) +
-                      model.coefs[3]*mean(trains_lc) +
-                      model.coefs.ci[4,1]*(log(x)-mean(log(x))) +
-                      model.coefs[5]*mean(light) +
-                      model.coefs[6]*mean(light2) +
-                      model.coefs[7]*mean(dawnordusk) +
-                      mean(kilometre)
-                  ),
-                  ymax=invcloglog(
-                    model.coefs[1] +
-                      model.coefs[2]*mean(egk_lc) +
-                      model.coefs[3]*mean(trains_lc) +
-                      model.coefs.ci[4,2]*(log(x)-mean(log(x))) +
-                      model.coefs[5]*mean(light) +
-                      model.coefs[6]*mean(light2) +
-                      model.coefs[7]*mean(dawnordusk) +
-                      mean(kilometre)
-                  )
-  ),
-  alpha=0.3) +
+ggplot(speed_mean_ci) +
+  geom_line(aes(x=x, y=y), size=0.8) +
+  geom_ribbon(aes(x=x, ymin=ymin, ymax=ymax), alpha=0.3) +
   ylab("Likelihood of Collision") +
   xlab("Train Speed (km/hr)") +
   theme_bw() +
@@ -195,48 +89,13 @@ ggplot(data) +
   theme(axis.title.y = element_text(margin=unit(c(0,.3,0,0),"cm"))) +
   theme(panel.grid.major = element_line(size=0.1),panel.grid.minor = element_line(size=0.1)) +
   theme(text = element_text(size = 10)) +
-  scale_x_continuous(limits = c(10,160), breaks = seq(10,160,25))
+  scale_x_continuous(limits = c(1,160), breaks = seq(1,160,20))
 dev.off()
 
 png('figs/hour.png', pointsize = 12, res=300, width = 900, height = 900, bg='transparent')
-x <- seq(0,24,24/nrow(data))[-(1:1)]
-ggplot(data) +
-  geom_smooth(aes(x=x,
-                y=invcloglog(
-                  model.coefs[1] +
-                    model.coefs[2]*mean(egk_lc) +
-                    model.coefs[3]*mean(trains_lc) +
-                    model.coefs[4]*mean(speed_lc) +
-                    model.coefs[5]*(sin((2 * pi * (x - 6)) / 24)-mean(sin((2 * pi * (x - 6)) / 24))) +
-                    model.coefs[6]*(sin((2 * pi * (x - 6)) / 24)^2-mean(sin((2 * pi * (x - 6)) / 24)^2)) +
-                    model.coefs[7]*(dawn.or.dusk(h=x,dawn=dawn,dusk=dusk)-mean(dawn.or.dusk(h=x,dawn=dawn,dusk=dusk))) +
-                    mean(kilometre)
-                )
-  ),
-  size=0.8, col='black') +
-  geom_ribbon(aes(x=x,
-                  ymin=invcloglog(
-                    model.coefs[1] +
-                      model.coefs[2]*mean(egk_lc) +
-                      model.coefs[3]*mean(trains_lc) +
-                      model.coefs[4]*mean(speed_lc) +
-                      model.coefs.ci[5,1]*(sin((2 * pi * (x - 6)) / 24)-mean(sin((2 * pi * (x - 6)) / 24))) +
-                      model.coefs.ci[6,1]*(sin((2 * pi * (x - 6)) / 24)^2-mean(sin((2 * pi * (x - 6)) / 24)^2)) +
-                      model.coefs.ci[7,1]*(dawn.or.dusk(h=x,dawn=dawn,dusk=dusk)-mean(dawn.or.dusk(h=x,dawn=dawn,dusk=dusk))) +
-                      mean(kilometre)
-                  ),
-                  ymax=invcloglog(
-                    model.coefs[1] +
-                      model.coefs[2]*mean(egk_lc) +
-                      model.coefs[3]*mean(trains_lc) +
-                      model.coefs[4]*mean(speed_lc) +
-                      model.coefs.ci[5,2]*(sin((2 * pi * (x - 6)) / 24)-mean(sin((2 * pi * (x - 6)) / 24))) +
-                      model.coefs.ci[6,2]*(sin((2 * pi * (x - 6)) / 24)^2-mean(sin((2 * pi * (x - 6)) / 24)^2)) +
-                      model.coefs.ci[7,2]*(dawn.or.dusk(h=x,dawn=dawn,dusk=dusk)-mean(dawn.or.dusk(h=x,dawn=dawn,dusk=dusk))) +
-                      mean(kilometre)
-                  )
-  ),
-  alpha=0.3) +
+ggplot(hour_mean_ci) +
+  geom_smooth(aes(x=x, y=y), size=0.8, col='black') +
+  geom_ribbon(aes(x=x, ymin=ymin, ymax=ymax), alpha=0.3) +
   ylab("Likelihood of Collision") +
   xlab("Hour") +
   theme_bw() +
@@ -251,354 +110,150 @@ dev.off()
 
 ################ Calibration plots ##################
 
-y <- coll.glm$data$y
-p <- predict(coll.glm, coll.glm$data, type="response")
+perform.sim <- function(model){
+  roc <- function (obsdat, preddat){
+    if (length(obsdat) != length(preddat)) 
+      stop("obs and preds must be equal lengths")
+    n.x <- length(obsdat[obsdat == 0])
+    n.y <- length(obsdat[obsdat == 1])
+    xy <- c(preddat[obsdat == 0], preddat[obsdat == 1])
+    rnk <- rank(xy)
+    roc <- ((n.x * n.y) + ((n.x * (n.x + 1))/2) - sum(rnk[1:n.x]))/(n.x * n.y)
+    return(round(roc, 4))
+  }
+  
+  y <- model$data$y
+  p <- predict(model, model$data, type="response")
+  
+  p.b <- .bincode(p,seq(min(p),max(p),(max(p)-min(p))/10),include.lowest = TRUE)
+  
+  yp_bins <- data.frame(y,p,p.b)
+  
+  
+  plot.info <- ddply(yp_bins, ~p.b, summarise,
+                     count=length(y),
+                     prop_coll=sum(y)/length(y),
+                     prop_nocoll=(length(y)-sum(y))/length(y),
+                     prop_lo=binom.test(sum(y), length(y), 0.5)$conf.int[1],
+                     prop_hi=binom.test(sum(y), length(y), 0.5)$conf.int[2],
+                     median_p=median(p)
+  )
+  
+  calib <- glm(y~log(p), family=binomial(link=cloglog), data=yp_bins)
+  roc <- roc(y,p)
+  perform.glm <- rbind(calib_int=calib$coefficients[1], calib_slope=calib$coefficients[2], roc)
+  colnames(perform.glm) <- parent.frame()$i[]
+  return(perform.glm)
+}
 
-p.b <- .bincode(p,seq(min(p),max(p),(max(p)-min(p))/10),include.lowest = TRUE)
 
-yp_bins <- data.frame(y,p,p.b)
+model.list <- list(coll.glm.wo_trains, coll.glm.wo_egk, coll.glm.wo_speed, coll.glm.wo_temp, coll.glm.w_trains)
+names(model.list) <- c("wo_trains", "wo_egk", "wo_speed", "wo_temp", "all")
 
+model.perform.list <- lapply(model.list, perform.sim)
 
-plot.info <- ddply(yp_bins, ~p.b, summarise,
-                   count=length(y),
-                   prop_coll=sum(y)/length(y),
-                   prop_nocoll=(length(y)-sum(y))/length(y),
-                   prop_lo=binom.test(sum(y), length(y), 0.5)$conf.int[1],
-                   prop_hi=binom.test(sum(y), length(y), 0.5)$conf.int[2],
-                   median_p=median(p)
-)
+model.cv.perform.list <- list(cv_coll.glm.wo_trains, cv_coll.glm.wo_egk, cv_coll.glm.wo_speed, cv_coll.glm.wo_temp, cv_coll.glm.w_trains)
 
-calib <- glm(y~log(p), family=binomial(link=cloglog), data=yp_bins)
-roc <- roc(y,p)
-perform.glm <- rbind(calib_int=calib$coefficients[1], calib_slope=calib$coefficients[2], roc)
-colnames(perform.glm) <- "0.0"
+cv_plot_data <- foreach(i = 1:length(model.list), .combine=rbind) %do% {
+  perform.glm.1000 <- cbind("orig_model"=signif(model.perform.list[[i]], digits=4),
+                            "cv_model_mean"=signif(apply(model.cv.perform.list[[i]],1,mean), digits=4),
+                            "cv_model_sd"=signif(apply(model.cv.perform.list[[i]],1,sd), digits=4),
+                            "cv_model_rlo"=signif(apply(model.cv.perform.list[[i]],1,range), digits=4)[1,],
+                            "cv_model_rhi"=signif(apply(model.cv.perform.list[[i]],1,range), digits=4)[2,]
+  )
+  
+  metrics <- factor(c("Intercept","Slope","ROC"),
+                    levels=rev(c("Intercept","Slope","ROC"))
+                    )
+  
+  cv_plot <- transform(data.frame(id = as.character(names(model.list)[i]), x = metrics, y = perform.glm.1000[, 2], y_orig = perform.glm.1000[, 1]),
+                       ylo=perform.glm.1000[, 2] - 2*perform.glm.1000[, 3],
+                       yhi=perform.glm.1000[, 2] + 2*perform.glm.1000[, 3]
+                       )
+  cv_plot
+}
 
-png('figs/calib.png', pointsize = 12, res=300, width = 900, height = 900, bg='transparent')
-#png('figs/calib.png', pointsize = 12, res=300, width = 1400, height = 900, bg='transparent')
-ggplot() +
-  geom_line(data=yp_bins, aes(y=invcloglog(calib$coefficients[1]+calib$coefficients[2]*log(p)),x=p)) +
-  geom_pointrange(data=plot.info, aes(x=median_p, y=prop_coll, ymin=prop_lo, ymax=prop_hi), size = 0.2, inherit.aes=FALSE) +
-  geom_text(data=plot.info, aes(x=median_p, y=prop_coll, label=count),hjust=-0.3, vjust=-1, angle = 90, size = 2.0, inherit.aes=FALSE) +
-  geom_segment(aes(x = 0, y = 0, xend = .04, yend = .04), linetype=2, size=0.1, inherit.aes=FALSE) +
-  ylab("Observed Rate") +
-  xlab("Predicted Rate") +
-  theme_bw() +
-  theme(plot.margin=unit(c(.5,0,.1,.1),"cm")) +
-  theme(axis.title.x = element_text(margin=unit(c(.3,0,0,0),"cm"))) +
-  theme(axis.title.y = element_text(margin=unit(c(0,.3,0,0),"cm"))) +
-  theme(panel.grid.major = element_line(size=0.1),panel.grid.minor = element_line(size=0.1)) +
-  theme(text = element_text(size = 12))
-dev.off()
+# y <- coll.glm$data$y
+# p <- predict(coll.glm, coll.glm$data, type="response")
+# 
+# p.b <- .bincode(p,seq(min(p),max(p),(max(p)-min(p))/10),include.lowest = TRUE)
+# 
+# yp_bins <- data.frame(y,p,p.b)
+# 
+# 
+# plot.info <- ddply(yp_bins, ~p.b, summarise,
+#                    count=length(y),
+#                    prop_coll=sum(y)/length(y),
+#                    prop_nocoll=(length(y)-sum(y))/length(y),
+#                    prop_lo=binom.test(sum(y), length(y), 0.5)$conf.int[1],
+#                    prop_hi=binom.test(sum(y), length(y), 0.5)$conf.int[2],
+#                    median_p=median(p)
+# )
+# 
+# calib <- glm(y~log(p), family=binomial(link=cloglog), data=yp_bins)
+# roc <- roc(y,p)
+# perform.glm <- rbind(calib_int=calib$coefficients[1], calib_slope=calib$coefficients[2], roc)
+# colnames(perform.glm) <- "0.0"
 
-png('figs/roc.png', pointsize = 12, res=300, width = 900, height = 900, bg='transparent')
-ggplot() +
-  stat_roc(data=yp_bins, aes(d=y,m=p), n.cuts = 0, size=0.5) +
-  geom_segment(aes(x = 0, y = 0, xend = 1, yend = 1), linetype=2, size=0.1, inherit.aes=FALSE) +
-  ylab("True Positive Fraction") +
-  xlab("False Positive Fraction") +
-  theme_bw() +
-  theme(plot.margin=unit(c(.5,0,.1,.1),"cm")) +
-  theme(axis.title.x = element_text(margin=unit(c(.3,0,0,0),"cm"))) +
-  theme(axis.title.y = element_text(margin=unit(c(0,.3,0,0),"cm"))) +
-  theme(panel.grid.major = element_line(size=0.1),panel.grid.minor = element_line(size=0.1)) +
-  theme(text = element_text(size = 12))
-dev.off()
+# png('figs/calib.png', pointsize = 12, res=300, width = 900, height = 900, bg='transparent')
+# #png('figs/calib.png', pointsize = 12, res=300, width = 1400, height = 900, bg='transparent')
+# ggplot() +
+#   geom_line(data=yp_bins, aes(y=invcloglog(calib$coefficients[1]+calib$coefficients[2]*log(p)),x=p)) +
+#   geom_pointrange(data=plot.info, aes(x=median_p, y=prop_coll, ymin=prop_lo, ymax=prop_hi), size = 0.2, inherit.aes=FALSE) +
+#   geom_text(data=plot.info, aes(x=median_p, y=prop_coll, label=count),hjust=-0.3, vjust=-1, angle = 90, size = 2.0, inherit.aes=FALSE) +
+#   geom_segment(aes(x = 0, y = 0, xend = .04, yend = .04), linetype=2, size=0.1, inherit.aes=FALSE) +
+#   ylab("Observed Rate") +
+#   xlab("Predicted Rate") +
+#   theme_bw() +
+#   theme(plot.margin=unit(c(.5,0,.1,.1),"cm")) +
+#   theme(axis.title.x = element_text(margin=unit(c(.3,0,0,0),"cm"))) +
+#   theme(axis.title.y = element_text(margin=unit(c(0,.3,0,0),"cm"))) +
+#   theme(panel.grid.major = element_line(size=0.1),panel.grid.minor = element_line(size=0.1)) +
+#   theme(text = element_text(size = 12))
+# dev.off()
+# 
+# png('figs/roc.png', pointsize = 12, res=300, width = 900, height = 900, bg='transparent')
+# ggplot() +
+#   stat_roc(data=yp_bins, aes(d=y,m=p), n.cuts = 0, size=0.5) +
+#   geom_segment(aes(x = 0, y = 0, xend = 1, yend = 1), linetype=2, size=0.1, inherit.aes=FALSE) +
+#   ylab("True Positive Fraction") +
+#   xlab("False Positive Fraction") +
+#   theme_bw() +
+#   theme(plot.margin=unit(c(.5,0,.1,.1),"cm")) +
+#   theme(axis.title.x = element_text(margin=unit(c(.3,0,0,0),"cm"))) +
+#   theme(axis.title.y = element_text(margin=unit(c(0,.3,0,0),"cm"))) +
+#   theme(panel.grid.major = element_line(size=0.1),panel.grid.minor = element_line(size=0.1)) +
+#   theme(text = element_text(size = 12))
+# dev.off()
 
-perform.glm.1000 <- cbind("full_model"=signif(perform.glm, digits=4),
-                          "cv_model_mean"=signif(apply(perform.glm.cv,1,mean), digits=4),
-                          "cv_model_sd"=signif(apply(perform.glm.cv,1,sd), digits=4),
-                          "cv_model_rlo"=signif(apply(perform.glm.cv,1,range), digits=4)[1,],
-                          "cv_model_rhi"=signif(apply(perform.glm.cv,1,range), digits=4)[2,]
-)
+# perform.glm.1000 <- cbind("full_model"=signif(perform.glm, digits=4),
+#                           "cv_model_mean"=signif(apply(perform.glm.cv,1,mean), digits=4),
+#                           "cv_model_sd"=signif(apply(perform.glm.cv,1,sd), digits=4),
+#                           "cv_model_rlo"=signif(apply(perform.glm.cv,1,range), digits=4)[1,],
+#                           "cv_model_rhi"=signif(apply(perform.glm.cv,1,range), digits=4)[2,]
+# )
 
-metrics <- factor(c("Intercept","Slope","ROC"),
-                  levels=rev(c("Intercept","Slope","ROC")))
-
-cv_plot <- transform(data.frame(x = metrics, y = perform.glm.1000[, 2], y_orig = perform.glm.1000[, 1]),
-                  ylo=perform.glm.1000[, 2] - 2*perform.glm.1000[, 3],
-                  yhi=perform.glm.1000[, 2] + 2*perform.glm.1000[, 3]
-                  )
-
-png('figs/validate.png', pointsize = 12, res=300, width = 900, height = 900, bg='transparent')
+png('figs/validate_colour.png', pointsize = 10, res=300, width = 900, height = 900, bg='transparent')
 p <- ggplot() +
-  geom_pointrange(data=cv_plot, aes(x=x, y=y, ymin=ylo, ymax=yhi), size = 0.1) +
+  geom_pointrange(data=cv_plot_data, aes(x=x, y=y, ymin=ylo, ymax=yhi, colour = factor(id, rev(c("wo_trains","wo_egk","wo_speed","wo_temp","all")))), size = 0.5, fatten=1, position = position_dodge(width=0.75)) +
   coord_flip() +
   ylab("Value") +
   xlab("Test Metric") +
+  labs(colour="Model") +
+  geom_text(data=cv_plot_data, aes(x=x, y=y, label=round(y,3), colour = factor(id, rev(c("wo_trains","wo_egk","wo_speed","wo_temp","all")))), hjust=1.3, vjust=1.3, size=2, inherit.aes=FALSE, position = position_dodge(width=0.75)) +
+  guides(colour = guide_legend(reverse = TRUE, override.aes = list(size=0.2))) +
   theme_bw() +
+  scale_color_manual(values=c("#7eb79d", "#a09cbc", "#fb8072", "#80b1d3", "#db9546", "#969696")) +
   theme(plot.margin=unit(c(.5,0,.1,.1),"cm")) +
   theme(axis.title.x = element_text(margin=unit(c(.3,0,0,0),"cm"))) +
   theme(axis.title.y = element_text(margin=unit(c(0,.3,0,0),"cm"))) +
-  theme(panel.grid.major = element_line(size=0.1),panel.grid.minor = element_line(size=0.1)) +
-  theme(text = element_text(size = 12))
-p + geom_point(data=cv_plot, aes(x=x, y=y_orig), size = 2, shape=1, inherit.aes=FALSE) +
+  theme(panel.grid.major = element_line(size=0.1), panel.grid.minor = element_line(size=0.1)) +
+  theme(text = element_text(size = 8)) +
+  scale_y_continuous(expand = c(0,0)) +
+  scale_x_discrete(expand = c(0,0))
+p + geom_point(data=cv_plot_data, aes(x=x, y=y_orig, colour = factor(id, rev(c("wo_trains","wo_egk","wo_speed","wo_temp","all")))), size = 2.5, shape=1, inherit.aes=FALSE, position = position_dodge(width=0.75)) +
   geom_segment(aes(x = 2.5, y = 0, xend = 3.5, yend = 0), linetype=2, size=0.1) +
-  geom_segment(aes(x = 0.5, y = 1, xend = 2.5, yend = 1), linetype=2, size=0.1)
+  geom_segment(aes(x = 0.5, y = 1, xend = 2.5, yend = 1), linetype=2, size=0.1) +
+  geom_segment(aes(x = 2.5, y = -2.5, xend = 2.5, yend = 2.5), linetype=1, size=0.1) +
+  geom_segment(aes(x = 1.5, y = -2.5, xend = 1.5, yend = 2.5), linetype=1, size=0.1)
 dev.off()
-
-#####################Plots for VicBio Conf talk######################
-
-pdf('/home/casey/Research/Projects/VicBioConf/graphics/tspd3.pdf', pointsize = 16)
-x <- seq(0.01,160,.1)
-ggplot() +
-  geom_line(aes(x=x,
-                y=invcloglog(
-                  model.coefs[1] +
-                    model.coefs[2]*mean(data$egk_lc) +
-                    model.coefs[3]*mean(data$trains_lc) +
-                    model.coefs[4]*(log(x)-mean(log(x))) +
-                    model.coefs[5]*mean(data$light) +
-                    model.coefs[6]*mean(data$light2) +
-                    model.coefs[7]*mean(data$dawnordusk) +
-                    mean(data$kilometre)
-                )
-  ),
-  size=0.5) +
-  ylab("Relative Collision Rate") +
-  xlab("Train Speed (km/hr)") +
-  theme_bw() +
-  theme(legend.key = element_blank()) +
-  theme(plot.margin=unit(c(.5,.5,.1,.1),"cm")) +
-  theme(axis.title.x = element_text(margin=unit(c(.3,0,0,0),"cm"))) +
-  theme(axis.title.y = element_text(margin=unit(c(0,.3,0,0),"cm"))) +
-  theme(panel.grid.major = element_line(size=0.1),panel.grid.minor = element_line(size=0.1)) +
-  theme(text = element_text(size = 16)) +
-  scale_x_continuous(breaks = seq(0,160,20), expand = c(0, 0), lim = c(0,160))
-dev.off()
-
-pdf('/home/casey/Research/Projects/VicBioConf/graphics/hour.pdf', pointsize = 16)
-x <- seq(0,24,24/nrow(data))[-(1:1)]
-ggplot(data) +
-  geom_smooth(aes(x=x,
-                  y=invcloglog(
-                    model.coefs[1] +
-                      model.coefs[2]*mean(egk_lc) +
-                      model.coefs[3]*mean(trains_lc) +
-                      model.coefs[4]*mean(speed_lc) +
-                      model.coefs[5]*(sin((2 * pi * (x - 6)) / 24)-mean(sin((2 * pi * (x - 6)) / 24))) +
-                      model.coefs[6]*(sin((2 * pi * (x - 6)) / 24)^2-mean(sin((2 * pi * (x - 6)) / 24)^2)) +
-                      model.coefs[7]*(dawn.or.dusk(h=x,dawn=dawn,dusk=dusk)-mean(dawn.or.dusk(h=x,dawn=dawn,dusk=dusk))) +
-                      mean(kilometre)
-                  )
-  ),
-  size=0.5, col='black') +
-  ylab("Relative Collision Rate") +
-  xlab("Hour") +
-  theme_bw() +
-  theme(legend.key = element_blank()) +
-  theme(plot.margin=unit(c(.5,.5,.1,.1),"cm")) +
-  theme(axis.title.x = element_text(margin=unit(c(.3,0,0,0),"cm"))) +
-  theme(axis.title.y = element_text(margin=unit(c(0,.3,0,0),"cm"))) +
-  theme(panel.grid.major = element_line(size=0.1),panel.grid.minor = element_line(size=0.1)) +
-  theme(text = element_text(size = 16)) +
-  scale_x_continuous(limits = c(0,24), breaks = seq(0,24,2), expand = c(0, 0))
-dev.off()
-
-###### alternative based on predictions for phd talk######
-
-png('/home/casey/Research/Projects/PhD_Thesis/completion_talk/graphics/train_occ_k.png', pointsize = 16, res=300, width = 1000, height = 900)
-x <- seq(0,1,1/nrow(data))[-(1:1)]
-ggplot(data) +
-  geom_line(aes(x=x,
-                y=invcloglog(
-                  model.coefs[1] +
-                    model.coefs[2]*(log(x)-mean(log(x))) +
-                    model.coefs[3]*mean(trains_lc) +
-                    model.coefs[4]*mean(speed_lc) +
-                    model.coefs[5]*mean(light) +
-                    model.coefs[6]*mean(light2) +
-                    model.coefs[7]*mean(dawnordusk) +
-                    mean(kilometre)
-                )
-  ),
-  size=0.8,colour='#94d1c7') +
-  geom_ribbon(aes(x=x,
-                  ymin=invcloglog(
-                    model.coefs[1] +
-                      model.coefs.ci[2,1]*(log(x)-mean(log(x))) +
-                      model.coefs[3]*mean(trains_lc) +
-                      model.coefs[4]*mean(speed_lc) +
-                      model.coefs[5]*mean(light) +
-                      model.coefs[6]*mean(light2) +
-                      model.coefs[7]*mean(dawnordusk) +
-                      mean(kilometre)
-                  ),
-                  ymax=invcloglog(
-                    model.coefs[1] +
-                      model.coefs.ci[2,2]*(log(x)-mean(log(x))) +
-                      model.coefs[3]*mean(trains_lc) +
-                      model.coefs[4]*mean(speed_lc) +
-                      model.coefs[5]*mean(light) +
-                      model.coefs[6]*mean(light2) +
-                      model.coefs[7]*mean(dawnordusk) +
-                      mean(kilometre)
-                  )
-  ),
-  alpha=0.3) +
-  ylab("RELATIVE COLLISION RATE") +
-  xlab("LIKELIHOOD OF SPECIES OCCURRENCE") +
-  theme_bw() +
-  theme(legend.key = element_blank()) +
-  theme(plot.margin=unit(c(.5,.5,.1,.1),"cm")) +
-  theme(axis.title.x = element_text(margin=unit(c(.3,0,0,0),"cm"))) +
-  theme(axis.title.y = element_text(margin=unit(c(0,.3,0,0),"cm"))) +
-  theme(panel.grid.major = element_line(size=0.1),panel.grid.minor = element_line(size=0.1)) +
-  theme(text = element_text(size = 8)) +
-  scale_x_continuous(breaks=seq(0,1,by=.1), expand = c(0, 0), lim=c(0,1))
-dev.off()
-
-
-png('/home/casey/Research/Projects/PhD_Thesis/completion_talk/graphics/train_vol_k.png', pointsize = 16, res=300, width = 1000, height = 900)
-x <- seq(0,60,60/nrow(data))[-(1:1)]
-ggplot(data) +
-  geom_line(aes(x=x,
-                y=invcloglog(
-                  model.coefs[1] +
-                    model.coefs[2]*mean(egk_lc) +
-                    model.coefs[3]*(log(x)-mean(log(x))) +
-                    model.coefs[4]*mean(speed_lc) +
-                    model.coefs[5]*mean(light) +
-                    model.coefs[6]*mean(light2) +
-                    model.coefs[7]*mean(dawnordusk) +
-                    mean(kilometre)
-                )
-  ),
-  size=0.8,colour='#94d1c7') +
-  geom_ribbon(aes(x=x,
-                  ymin=invcloglog(
-                    model.coefs[1] +
-                      model.coefs[2]*mean(egk_lc) +
-                      model.coefs.ci[3,1]*(log(x)-mean(log(x))) +
-                      model.coefs[4]*mean(speed_lc) +
-                      model.coefs[5]*mean(light) +
-                      model.coefs[6]*mean(light2) +
-                      model.coefs[7]*mean(dawnordusk) +
-                      mean(kilometre)
-                  ),
-                  ymax=invcloglog(
-                    model.coefs[1] +
-                      model.coefs[2]*mean(egk_lc) +
-                      model.coefs.ci[3,2]*(log(x)-mean(log(x))) +
-                      model.coefs[4]*mean(speed_lc) +
-                      model.coefs[5]*mean(light) +
-                      model.coefs[6]*mean(light2) +
-                      model.coefs[7]*mean(dawnordusk) +
-                      mean(kilometre)
-                  )
-  ),
-  alpha=0.3) +
-  ylab("RELATIVE COLLISION RATE") +
-  xlab("TRAIN FREQUENCY (TRAINS/HR)") +
-  theme_bw() +
-  theme(legend.key = element_blank()) +
-  theme(plot.margin=unit(c(.5,.5,.1,.1),"cm")) +
-  theme(axis.title.x = element_text(margin=unit(c(.3,0,0,0),"cm"))) +
-  theme(axis.title.y = element_text(margin=unit(c(0,.3,0,0),"cm"))) +
-  theme(panel.grid.major = element_line(size=0.1),panel.grid.minor = element_line(size=0.1)) +
-  theme(text = element_text(size = 8)) +
-  scale_x_continuous(breaks=seq(0,60,by=10), expand = c(0, 0), lim=c(0,60))
-dev.off()
-
-
-png('/home/casey/Research/Projects/PhD_Thesis/completion_talk/graphics/train_spd_k.png', pointsize = 16, res=300, width = 1000, height = 900)
-x <- seq(0,160,160/nrow(data))[-c(1,length(seq(0,160,160/(nrow(data)+1))))]
-ggplot(data) +
-  geom_line(aes(x=x,
-                y=invcloglog(
-                  model.coefs[1] +
-                    model.coefs[2]*mean(egk_lc) +
-                    model.coefs[3]*mean(trains_lc) +
-                    model.coefs[4]*(log(x)-mean(log(x))) +
-                    model.coefs[5]*mean(light) +
-                    model.coefs[6]*mean(light2) +
-                    model.coefs[7]*mean(dawnordusk) +
-                    mean(kilometre)
-                )
-  ),
-  size=0.8,colour='#94d1c7') +
-  geom_ribbon(aes(x=x,
-                  ymin=invcloglog(
-                    model.coefs[1] +
-                      model.coefs[2]*mean(egk_lc) +
-                      model.coefs[3]*mean(trains_lc) +
-                      model.coefs.ci[4,1]*(log(x)-mean(log(x))) +
-                      model.coefs[5]*mean(light) +
-                      model.coefs[6]*mean(light2) +
-                      model.coefs[7]*mean(dawnordusk) +
-                      mean(kilometre)
-                  ),
-                  ymax=invcloglog(
-                    model.coefs[1] +
-                      model.coefs[2]*mean(egk_lc) +
-                      model.coefs[3]*mean(trains_lc) +
-                      model.coefs.ci[4,2]*(log(x)-mean(log(x))) +
-                      model.coefs[5]*mean(light) +
-                      model.coefs[6]*mean(light2) +
-                      model.coefs[7]*mean(dawnordusk) +
-                      mean(kilometre)
-                  )
-  ),
-  alpha=0.3) +
-  ylab("RELATIVE COLLISION RATE") +
-  xlab("TRAIN SPEED (KM/HR)") +
-  theme_bw() +
-  theme(legend.key = element_blank()) +
-  theme(plot.margin=unit(c(.5,.5,.1,.1),"cm")) +
-  theme(axis.title.x = element_text(margin=unit(c(.3,0,0,0),"cm"))) +
-  theme(axis.title.y = element_text(margin=unit(c(0,.3,0,0),"cm"))) +
-  theme(panel.grid.major = element_line(size=0.1),panel.grid.minor = element_line(size=0.1)) +
-  theme(text = element_text(size = 8)) +
-  scale_x_continuous(breaks=seq(0,160,by=20), expand = c(0, 0), lim=c(0,160))
-dev.off()
-
-png('/home/casey/Research/Projects/PhD_Thesis/completion_talk/graphics/train_hour_k.png', pointsize = 16, res=300, width = 1000, height = 900)
-x <- seq(0,24,24/nrow(data))[-(1:1)]
-ggplot(data) +
-  geom_smooth(aes(x=x,
-                  y=invcloglog(
-                    model.coefs[1] +
-                      model.coefs[2]*mean(egk_lc) +
-                      model.coefs[3]*mean(trains_lc) +
-                      model.coefs[4]*mean(speed_lc) +
-                      model.coefs[5]*(sin((2 * pi * (x - 6)) / 24)-mean(sin((2 * pi * (x - 6)) / 24))) +
-                      model.coefs[6]*(sin((2 * pi * (x - 6)) / 24)^2-mean(sin((2 * pi * (x - 6)) / 24)^2)) +
-                      model.coefs[7]*(dawn.or.dusk(h=x,dawn=dawn,dusk=dusk)-mean(dawn.or.dusk(h=x,dawn=dawn,dusk=dusk))) +
-                      mean(kilometre)
-                  )
-  ),
-  size=0.8, colour='#94d1c7') +
-  geom_ribbon(aes(x=x,
-                  ymin=invcloglog(
-                    model.coefs[1] +
-                      model.coefs[2]*mean(egk_lc) +
-                      model.coefs[3]*mean(trains_lc) +
-                      model.coefs[4]*mean(speed_lc) +
-                      model.coefs.ci[5,1]*(sin((2 * pi * (x - 6)) / 24)-mean(sin((2 * pi * (x - 6)) / 24))) +
-                      model.coefs.ci[6,1]*(sin((2 * pi * (x - 6)) / 24)^2-mean(sin((2 * pi * (x - 6)) / 24)^2)) +
-                      model.coefs.ci[7,1]*(dawn.or.dusk(h=x,dawn=dawn,dusk=dusk)-mean(dawn.or.dusk(h=x,dawn=dawn,dusk=dusk))) +
-                      mean(kilometre)
-                  ),
-                  ymax=invcloglog(
-                    model.coefs[1] +
-                      model.coefs[2]*mean(egk_lc) +
-                      model.coefs[3]*mean(trains_lc) +
-                      model.coefs[4]*mean(speed_lc) +
-                      model.coefs.ci[5,2]*(sin((2 * pi * (x - 6)) / 24)-mean(sin((2 * pi * (x - 6)) / 24))) +
-                      model.coefs.ci[6,2]*(sin((2 * pi * (x - 6)) / 24)^2-mean(sin((2 * pi * (x - 6)) / 24)^2)) +
-                      model.coefs.ci[7,2]*(dawn.or.dusk(h=x,dawn=dawn,dusk=dusk)-mean(dawn.or.dusk(h=x,dawn=dawn,dusk=dusk))) +
-                      mean(kilometre)
-                  )
-  ),
-  alpha=0.3) +
-  ylab("RELATIVE COLLISION RATE") +
-  xlab("HOUR") +
-  theme_bw() +
-  theme(legend.key = element_blank()) +
-  theme(plot.margin=unit(c(.5,.5,.1,.1),"cm")) +
-  theme(axis.title.x = element_text(margin=unit(c(.3,0,0,0),"cm"))) +
-  theme(axis.title.y = element_text(margin=unit(c(0,.3,0,0),"cm"))) +
-  theme(panel.grid.major = element_line(size=0.1),panel.grid.minor = element_line(size=0.1)) +
-  theme(text = element_text(size = 8)) +
-  scale_x_continuous(breaks=seq(0,24,by=2), expand = c(0, 0), lim=c(0,24))
-dev.off()
-#############################################
