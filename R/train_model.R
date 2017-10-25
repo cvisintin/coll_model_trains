@@ -3,6 +3,7 @@ require(lmtest)
 require(foreach)
 require(doMC)
 require(arm)
+require(corrplot)
 
 ### Define functions #######
 invcloglog <- function (x) {1-exp(-exp(x))}
@@ -25,6 +26,10 @@ dawn.or.dusk <- function (h, dawn = 6, dusk = 18, slope = 2) {
          ifelse(h < dusk,
                 d(h, dawn, dusk, diff_inner),
                 d(h, dawn + 24, dusk, diff_outer)))
+}
+
+dev <- function (model) {
+  round(((model$null.deviance - model$deviance)/model$null.deviance)*100,2)
 }
 ################
 
@@ -53,7 +58,26 @@ data <- data.frame("y"=model.data.bin$coll,
 
 data <- cbind(data,model.data.bin[,c(6,10:11),with=FALSE])
 
-cor(data[,5:10])
+col_grad <- colorRampPalette(c("#000001", "#d9d9d9","#000000"))
+
+corr.coll <- cor(data[data$y==1,c("egk","trains","speed","hour")])
+png('figs/cor_coll.png', pointsize = 8, res=300, width = 900, height = 900, bg='transparent')
+corrplot.mixed(corr.coll, tl.col="black", tl.cex=1.2, cl.cex=0.8, cl.align.text='l', number.cex=0.8, number.digits=3, lower.col = "#4d4d4d", upper.col = col_grad(100), title="Cells with collisions", mar=c(0,0,1,0))
+dev.off()
+
+corr.nocoll <- cor(data[data$y==0,c("egk","trains","speed","hour")])
+corrplot.mixed(corr.nocoll, tl.col="black", tl.cex=1.2, cl.cex=0.8, number.cex=0.8, number.digits=3, lower.col = "#4d4d4d", upper.col = col_grad(100), title="Cells with no collisions", mar=c(0,0,1,0))
+
+#corr2 <- cor(data[,5:10])
+#corrplot.mixed(corr2, tl.col="black", tl.cex=1.2, number.cex=0.8, number.digits=3, lower.col = "#4d4d4d", upper.col = col_grad(100))
+
+
+hist(data[data$y==1,"egk"])
+hist(data[data$y==1,"trains"])
+hist(data[data$y==1,"speed"])
+hist(data[data$y==1,"hour"])
+
+plot(aggregate(data$trains,by=list(Hour=data$hour),mean), type='l')
 
 save(data, file="data/coll_glm_data")
 write.csv(data, file="data/coll_glm_data.csv", row.names=F)
@@ -62,26 +86,31 @@ coll.glm.wo_trains <- stats::glm(formula=y ~ egk_lc + speed_lc + light + light2 
                             offset=kilometre,
                             family=stats::binomial(link="cloglog"),
                             data=data)
+dev(coll.glm.wo_trains)
 
 coll.glm.wo_egk <- stats::glm(formula=y ~ speed_lc + light + light2 + dawnordusk,
                                  offset=kilometre,
                                  family=stats::binomial(link="cloglog"),
                                  data=data)
+dev(coll.glm.wo_egk)
 
 coll.glm.wo_speed <- stats::glm(formula=y ~ egk_lc + light + light2 + dawnordusk,
                               offset=kilometre,
                               family=stats::binomial(link="cloglog"),
                               data=data)
+dev(coll.glm.wo_speed)
 
 coll.glm.wo_temp <- stats::glm(formula=y ~ egk_lc + speed_lc,
                                 offset=kilometre,
                                 family=stats::binomial(link="cloglog"),
                                 data=data)
+dev(coll.glm.wo_temp)
 
 coll.glm.w_trains <- stats::glm(formula=y ~ egk_lc + trains_lc + speed_lc + light + light2 + dawnordusk,
                             offset=kilometre,
                             family=stats::binomial(link="cloglog"),
                             data=data)
+dev(coll.glm.w_trains)
 
 
 lrtest(coll.glm.wo_trains, coll.glm.wo_egk)
@@ -288,20 +317,23 @@ data.b <- as.data.table(cbind(data,"hour"=model.data.bin$hour, "id"=model.data.b
 data.c <- as.data.table(cbind(data,"hour"=model.data.bin$hour, "id"=model.data.bin$id, "length"=model.data.bin$length))
 
 data.b[egk_lc >= 1.91918 & ((hour >= 5 & hour < 9) | (hour >= 16 & hour < 20)) & speed_lc > -0.05173123, mean(trips), by="id"]
+#data.b[egk_lc >= 1.91918 & ((hour >= 5 & hour < 9) | (hour >= 16 & hour < 20)) & speed_lc > -0.05173123, sum(y), by="id"]
 sum(data.b[egk_lc >= 1.91918 & ((hour >= 5 & hour < 9) | (hour >= 16 & hour < 20)) & speed_lc > -0.05173123, mean(trips), by="id"]$V1)
 data.b[egk_lc >= 1.91918 & ((hour >= 5 & hour < 9) | (hour >= 16 & hour < 20)) & speed > -0.05173123, speed_lc := -0.05173123] #note values for egk and speed are on the transformed scale
 #range(data.b[egk >= 2.324645 & ((hour >= 6 & hour < 9) | (hour >= 17 & hour < 20)), speed])
 
 data.c[speed_lc > 0.3537339, .N, by="id"]
+#data.c[speed_lc > 0.3537339, sum(y), by="id"]
 sum(data.c[speed_lc > 0.3537339, mean(length), by="id"]$V1)
-data.c[speed_lc > 0.3537339, egk_lc := egk_lc-log(2)] #note values for egk and speed are on the transformed scale
+#data.c[speed_lc > 0.3537339, egk_lc := egk_lc-log(2)] #note values for egk and speed are on the transformed scale
+data.c[speed_lc > 0.3537339, egk_lc := log(.01)]
 #range(data.c[speed > 0.1714123, egk])
 
-manage.a <- sum(predict(coll.glm.w_trains, data.a, type="response"))
+manage.a <- c(sum(predict(coll.glm.w_trains, data.a, type="response", se.fit = TRUE)[[1]]),sum(predict(coll.glm.w_trains, data.a, type="response", se.fit = TRUE)[[2]]))
 
-manage.b <- sum(predict(coll.glm.w_trains, data.b, type="response"))
+manage.b <-c(sum(predict(coll.glm.w_trains, data.b, type="response", se.fit = TRUE)[[1]]),sum(predict(coll.glm.w_trains, data.b, type="response", se.fit = TRUE)[[2]]))
 
-manage.c <- sum(predict(coll.glm.w_trains, data.c, type="response"))
+manage.c <- c(sum(predict(coll.glm.w_trains, data.c, type="response", se.fit = TRUE)[[1]]),sum(predict(coll.glm.w_trains, data.c, type="response", se.fit = TRUE)[[2]]))
 
 ##################### Modelling with Greta ################
 require(greta)
@@ -318,18 +350,15 @@ y <- as_data(data$y)
 
 distribution(y) = binomial(1, p)
 
-options(greta_float_type = '64')
-#options(greta_float_type = '32')
+model <- model(int, coef, precision="double")
 
-model <- model(int, coef)
-
-set.seed(123)
+set.seed(333)
 system.time(draws <- mcmc(model,
-                          warmup = 600,
+                          warmup = 1000,
                           n_samples = 1000,
                           initial_values = c(-6, rep(0, 6))
                           )
-            )
+            ) ### runtime: 439.088 seconds
 
 require(MCMCvis)
 
