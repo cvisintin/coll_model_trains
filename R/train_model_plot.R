@@ -272,7 +272,7 @@ p <- ggplot(data=cv_plot_data[grep("calib_slope",row.names(cv_plot_data)), ]) +
 p + geom_point(data=cv_plot_data[grep("calib_slope",row.names(cv_plot_data)), ], aes(x=x, y=y_orig, colour = factor(id, rev(c("wo_trains","wo_egk","wo_speed","wo_temp","all")))), size = 2.5, shape=1, inherit.aes=FALSE, position = position_dodge(width=0.75))
 dev.off()
 
-png('figs/validate_colour_03.png', pointsize = 10, res=300, width = 700, height = 1000, bg='transparent')
+png('figs/validate_colour_03.png', pointsize = 10, res=300, width = 1500, height = 1200, bg='transparent')
 p <- ggplot(data=cv_plot_data[grep("roc",row.names(cv_plot_data)), ]) +
   geom_pointrange(aes(x=x, y=y, ymin=ylo, ymax=yhi, colour = factor(id, rev(c("wo_trains","wo_egk","wo_speed","wo_temp","all")))), size = 0.5, fatten=1, position = position_dodge(width=0.75)) +
   coord_flip() +
