@@ -61,13 +61,14 @@ data <- cbind(data,model.data.bin[,c(6,10:11),with=FALSE])
 col_grad <- colorRampPalette(c("#000001", "#d9d9d9","#000000"))
 
 corr.coll <- cor(data[data$y==1,c("egk","trains","speed","hour")])
-png('figs/cor_coll.png', pointsize = 8, res=300, width = 900, height = 900, bg='transparent')
+png('figs/cor_coll.png', pointsize = 8, res=300, width = 1100, height = 900, bg='transparent')
 corrplot.mixed(corr.coll, tl.col="black", tl.cex=1.2, cl.cex=0.8, cl.align.text='l', number.cex=0.8, number.digits=3, lower.col = "#4d4d4d", upper.col = col_grad(100), title="Cells with collisions", mar=c(0,0,1,0))
 dev.off()
 
 corr.nocoll <- cor(data[data$y==0,c("egk","trains","speed","hour")])
-corrplot.mixed(corr.nocoll, tl.col="black", tl.cex=1.2, cl.cex=0.8, number.cex=0.8, number.digits=3, lower.col = "#4d4d4d", upper.col = col_grad(100), title="Cells with no collisions", mar=c(0,0,1,0))
-
+png('figs/cor_nocoll.png', pointsize = 8, res=300, width = 1100, height = 900, bg='transparent')
+corrplot.mixed(corr.nocoll, tl.col="black", tl.cex=1.2, cl.cex=0.8, cl.align.text='l', number.cex=0.8, number.digits=3, lower.col = "#4d4d4d", upper.col = col_grad(100), title="Cells with no collisions", mar=c(0,0,1,0))
+dev.off()
 #corr2 <- cor(data[,5:10])
 #corrplot.mixed(corr2, tl.col="black", tl.cex=1.2, number.cex=0.8, number.digits=3, lower.col = "#4d4d4d", upper.col = col_grad(100))
 
