@@ -317,10 +317,10 @@ data.a <- as.data.table(data)
 data.b <- as.data.table(cbind(data,"hour"=model.data.bin$hour, "id"=model.data.bin$id, "trips"=model.data.bin$trains))
 data.c <- as.data.table(cbind(data,"hour"=model.data.bin$hour, "id"=model.data.bin$id, "length"=model.data.bin$length))
 
-data.b[egk_lc >= 1.91918 & ((hour >= 5 & hour < 9) | (hour >= 16 & hour < 20)) & speed_lc > -0.05173123, mean(trips), by="id"]
+data.b[egk_lc >= 1.408607 & ((hour >= 5 & hour < 9) | (hour >= 16 & hour < 20)) & speed_lc > -0.3394367, mean(trips), by="id"]
 #data.b[egk_lc >= 1.91918 & ((hour >= 5 & hour < 9) | (hour >= 16 & hour < 20)) & speed_lc > -0.05173123, sum(y), by="id"]
-sum(data.b[egk_lc >= 1.91918 & ((hour >= 5 & hour < 9) | (hour >= 16 & hour < 20)) & speed_lc > -0.05173123, mean(trips), by="id"]$V1)
-data.b[egk_lc >= 1.91918 & ((hour >= 5 & hour < 9) | (hour >= 16 & hour < 20)) & speed > -0.05173123, speed_lc := -0.05173123] #note values for egk and speed are on the transformed scale
+sum(data.b[egk_lc >= 1.408607 & ((hour >= 5 & hour < 9) | (hour >= 16 & hour < 20)) & speed_lc > -0.3394367, mean(trips), by="id"]$V1)
+data.b[egk_lc >= 1.408607 & ((hour >= 5 & hour < 9) | (hour >= 16 & hour < 20)) & speed > -0.3394367, speed_lc := -0.3394367] #note values for egk and speed are on the transformed scale
 #range(data.b[egk >= 2.324645 & ((hour >= 6 & hour < 9) | (hour >= 17 & hour < 20)), speed])
 
 data.c[speed_lc > 0.3537339, .N, by="id"]
@@ -330,40 +330,25 @@ sum(data.c[speed_lc > 0.3537339, mean(length), by="id"]$V1)
 data.c[speed_lc > 0.3537339, egk_lc := log(.01)]
 #range(data.c[speed > 0.1714123, egk])
 
-manage.a <- c(sum(predict(coll.glm.w_trains, data.a, type="response", se.fit = TRUE)[[1]]),sum(predict(coll.glm.w_trains, data.a, type="response", se.fit = TRUE)[[2]]))
+pred.sim <- function(model,data,sims){
+  coll.sim <- sim(model, sims)
+  beta.sim <- coll.sim@coef
+  N.sim <- length(data$y)
+  X.sim <- cbind(rep(1,N.sim),data$egk_lc,data$speed_lc,data$light,data$light2,data$dawnordusk)
+  offset.sim <- data$kilometre
+  rate.sim <- array(NA,c(sims,N.sim))
+  for(s in 1:sims){
+    rate.sim[s,] <- exp(X.sim %*% beta.sim[s, ] + offset.sim)
+  }
+  coll.totals <- rowSums(rate.sim)
+  return(c(quantile(coll.totals, 0.025), mean(coll.totals), quantile(coll.totals, 0.975)))
+}
 
-manage.b <-c(sum(predict(coll.glm.w_trains, data.b, type="response", se.fit = TRUE)[[1]]),sum(predict(coll.glm.w_trains, data.b, type="response", se.fit = TRUE)[[2]]))
+set.seed(123)
+manage.a <- pred.sim(coll.glm.wo_trains, data.a, 1000)
 
-manage.c <- c(sum(predict(coll.glm.w_trains, data.c, type="response", se.fit = TRUE)[[1]]),sum(predict(coll.glm.w_trains, data.c, type="response", se.fit = TRUE)[[2]]))
+set.seed(123)
+manage.b <- pred.sim(coll.glm.wo_trains, data.b, 1000)
 
-##################### Modelling with Greta ################
-require(greta)
-load("data/coll_glm_data")
-
-int = normal(-7, 3)
-coef = normal(0, 3, dim=6)
-
-X <- as_data(data[,c("egk_lc","trains_lc","speed_lc",'light',"light2","dawnordusk")])
-
-p <- icloglog(int + X %*% coef + data$kilometre)
-
-y <- as_data(data$y)
-
-distribution(y) = binomial(1, p)
-
-model <- model(int, coef, precision="double")
-
-set.seed(333)
-system.time(draws <- mcmc(model,
-                          warmup = 1000,
-                          n_samples = 1000,
-                          initial_values = c(-6, rep(0, 6))
-                          )
-            ) ### runtime: 439.088 seconds
-
-require(MCMCvis)
-
-MCMCtrace(draws)
-MCMCplot(draws)#, xlim = c(-8, 2))
-
-##################### Benchmarking with Stan ################
+set.seed(123)
+manage.c <- pred.sim(coll.glm.wo_trains, data.c, 1000)
